@@ -1,0 +1,39 @@
+[tool.poetry]
+name = "neat-jax"
+version = "0.1.0"
+description = ""
+authors = ["Ryan Pégoud <ryanpegoud@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+chex = "^0.1.85"
+flax = "^0.8.0"
+isort = "^5.13.2"
+ruff = "^0.1.14"
+black = "^24.1.1"
+poethepoet = "^0.24.4"
+jax = "^0.4.23"
+jaxlib = "^0.4.23"
+jraph = "^0.0.6.dev0"
+matplotlib = "^3.8.2"
+networkx = "^3.2.1"
+
+[tool.ruff]
+extend-ignore = ["E501"]
+extend-exclude = ["__init__.py"]
+line-length = 86
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.25.2"
+pytest = "^7.4.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poe.tasks]
+format = { cmd = "black .", help = "Check code style and format it" }
+format_imports = { cmd = "isort .", help = "Sort imports" }
+lint = { cmd = "ruff check . --fix", help = "Perform linting on your code" }
+format_and_lint = ["format", "format_imports", "lint"]
