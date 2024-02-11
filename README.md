@@ -1,4 +1,18 @@
-# ***🧬 Neat JAX***
+<!-- # ***🧬 Neat JAX*** -->
+# `neatJax`: Fast Evolution of Neural Network Topologies
+
+<center>
+    <img src="https://raw.githubusercontent.com/RPegoud/neat-jax/2d8fe31de24a1af26b90cab1722f6803c7d04567/images/Neat%20logo.svg?token=AOPYRH6UJEB6QXS5H26YVX3FZCJ26" width="170" align="right"/>
+</center>
+
+<a href= "https://github.com/psf/black">
+<img src="https://img.shields.io/badge/code%20style-black-000000.svg" /></a>
+<a href="https://github.com/RPegoud/jym/blob/main/LICENSE">
+<img src="https://img.shields.io/github/license/RPegoud/jym" /></a>
+<a href="https://github.com/astral-sh/ruff">
+<img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json"/></a>
+
+JAX implementation of the Neat ``(Evolving Neural Networks through Augmenting Topologies)`` algorithm.
 
 ## ***📝 References***
 
