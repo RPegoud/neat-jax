@@ -21,17 +21,17 @@ JAX implementation of the Neat ``(Evolving Neural Networks through Augmenting To
 
 Forward Pass:
 
-* Add connection weights
-* Add individual activation functions
-* Add activation of output nodes, return output values
-* Test forward when a single neuron is linked to multiple receivers
-* Test forward pass on larger architectures
+* [x] Add connection weights
+* [x] Add individual activation functions
+* [ ] Add conditional activation of output nodes, return output values
+* [ ] Test forward when a single neuron is linked to multiple receivers
+* [ ] Test forward pass on larger architectures
 
 Mutation:
 
-* Add novelty fields to Network dataclass
-* Determine mutation frequency and common practices
-* Implement mutation for two simple networks
+* [ ] Add novelty fields to Network dataclass
+* [ ] Determine mutation frequency and common practices
+* [ ] Implement mutation for two simple networks
 
 ## ***📝 References***
 

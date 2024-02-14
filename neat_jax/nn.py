@@ -6,14 +6,11 @@ import jax.numpy as jnp
 from neat_jax import ActivationState, Network
 
 
-def sigmoid(x) -> jnp.float32:
-    return 1 / (1 + jnp.exp(-x))
-
-
 def init(
     senders: jnp.ndarray,
     receivers: jnp.ndarray,
     weights: jnp.ndarray,
+    activation_indices: jnp.ndarray,
     inputs: jnp.ndarray,
     node_types: jnp.ndarray,
     max_nodes: int,
@@ -29,6 +26,11 @@ def init(
         (jnp.ones(max_nodes, dtype=jnp.int32) * -1).at[: len(receivers)].set(receivers)
     )
     weights = (jnp.zeros(max_nodes, dtype=jnp.int32)).at[: len(weights)].set(weights)
+    activation_indices = (
+        (jnp.zeros(max_nodes, dtype=jnp.int32))
+        .at[: len(activation_indices)]
+        .set(activation_indices)
+    )
 
     activations = jnp.zeros(max_nodes).at[: len(inputs)].set(inputs)
     activated_nodes = jnp.int32(activations > 0)
@@ -44,6 +46,7 @@ def init(
             node_indices=jnp.arange(max_nodes, dtype=jnp.int32),
             node_types=node_types,
             weights=weights,
+            activation_indices=activation_indices,
             senders=senders,
             receivers=receivers,
         ),
@@ -120,6 +123,26 @@ def add_activations(
     """
 
     def _add_single_activation(activation_state: jnp.ndarray, x: tuple) -> jnp.ndarray:
+
+        def _activation_fn(activation_index: int, x: float) -> jnp.float32:
+            """
+            Given an index, selects a function and computes the activation of a scalar.
+            """
+            return jax.lax.switch(
+                activation_index,
+                [
+                    lambda x: 1 / (1 + jnp.exp(-x)),  # sigmoid
+                    lambda x: jnp.divide(1, x),  # inverse
+                    lambda x: jnp.sinh(x) / jnp.cosh(x),  # hyperbolic cosine
+                    lambda x: jnp.float32(jnp.maximum(0, x)),  # relu
+                    lambda x: jnp.float32(jnp.abs(x)),  # absolute value
+                    lambda x: jnp.sin(x),  # sine
+                    lambda x: jnp.exp(jnp.square(-x)),  # gaussian
+                    lambda x: jnp.float32(jnp.sign(x)),  # step
+                ],
+                operand=x,
+            )
+
         def _update_activation_state(val: tuple):
             """
             Adds the activation of a sender to a receiver's value and
@@ -128,16 +151,18 @@ def add_activations(
             Note: the deactivation of the sender nodes will only be effective at the
             end of the iteration (at the next step when computing which nodes should fire).
             """
-            activation_state, sender, receiver, weight = val
+            activation_state, sender, receiver, weight, activation_index = val
             values = activation_state.values
             activation_counts = activation_state.activation_counts
 
-            # conditionally apply the sigmoid function if
-            # the current node belongs to the hidden layers (node_type == 1)
+            # conditionally apply the current node's activation function if
+            # it belongs to the hidden layers (node_type == 1)
             sender_value = values.at[sender].get()
             values = jax.lax.cond(
                 net.node_types.at[sender].get() == 1,
-                lambda _: values.at[sender].set(sigmoid(sender_value)),
+                lambda _: values.at[sender].set(
+                    _activation_fn(activation_index, x=sender_value)
+                ),
                 lambda _: values,
                 operand=None,
             )
@@ -159,20 +184,20 @@ def add_activations(
             activation_state, *_ = val
             return (activation_state, None)
 
-        sender, receiver, weight = x
+        sender, receiver, weight, activation_index = x
 
         # nodes with activation -1 are not enabled and should not fire
         return jax.lax.cond(
             sender == -1,
             _bypass,
             _update_activation_state,
-            operand=(activation_state, sender, receiver, weight),
+            operand=(activation_state, sender, receiver, weight, activation_index),
         )
 
     activation_state, _ = jax.lax.scan(
         _add_single_activation,
         activation_state,
-        jnp.stack((senders, receivers, net.weights), axis=1),
+        jnp.stack((senders, receivers, net.weights, net.activation_indices), axis=1),
     )
     return activation_state
 

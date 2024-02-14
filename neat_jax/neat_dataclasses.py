@@ -29,6 +29,19 @@ class Network:
             - `1`: Hidden node
             - `2`: Output node
 
+        activation_indices (jnp.ndarray): Mapping index of the activation function used
+        by node `i`:
+
+        ```python
+        0: 1 / (1 + jnp.exp(-x)),  # sigmoid
+        1: jnp.divide(1, x),  # inverse
+        2: jnp.sinh(x) / jnp.cosh(x),  # hyperbolic cosine
+        3: jnp.float32(jnp.maximum(0, x)),  # relu
+        4: jnp.float32(jnp.abs(x)),  # absolute value
+        5: jnp.sin(x),  # sine
+        6: jnp.exp(jnp.square(-x)),  # gaussian
+        7: jnp.float32(jnp.sign(x)),  # step
+        ```
         edges (jnp.ndarray): Weight of the connection between sender and receiver `i`
         senders (jnp.ndarray): Array of node indices used as inputs to receiver nodes
         receivers (jnp.ndarray): Array of node indices used as outputs to sender nodes
@@ -36,6 +49,7 @@ class Network:
 
     node_indices: jnp.ndarray
     node_types: jnp.ndarray
+    activation_indices: jnp.ndarray
     weights: jnp.ndarray
     senders: jnp.ndarray
     receivers: jnp.ndarray
