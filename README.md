@@ -1,9 +1,12 @@
 <!-- # ***🧬 Neat JAX*** -->
-# `neatJax`: Fast Evolution of Neural Network Topologies
+# `neatJax`: Fast NeuroEvolution of Augmenting Topologies 🪸
 
 <center>
-    <img src="https://raw.githubusercontent.com/RPegoud/neat-jax/2d8fe31de24a1af26b90cab1722f6803c7d04567/images/Neat%20logo.svg?token=AOPYRH6UJEB6QXS5H26YVX3FZCJ26" width="170" align="right"/>
+    <img src="images/image.png" width="170" align="right"/>
 </center>
+<!-- <center>
+    <img src="https://raw.githubusercontent.com/RPegoud/neat-jax/2d8fe31de24a1af26b90cab1722f6803c7d04567/images/Neat%20logo.svg?token=AOPYRH6UJEB6QXS5H26YVX3FZCJ26" width="170" align="right"/>
+</center> -->
 
 <a href= "https://github.com/psf/black">
 <img src="https://img.shields.io/badge/code%20style-black-000000.svg" /></a>
@@ -14,6 +17,22 @@
 
 JAX implementation of the Neat ``(Evolving Neural Networks through Augmenting Topologies)`` algorithm.
 
+## ***🚀 TO DO***
+
+Forward Pass:
+
+* Add connection weights
+* Add individual activation functions
+* Add activation of output nodes, return output values
+* Test forward when a single neuron is linked to multiple receivers
+* Test forward pass on larger architectures
+
+Mutation:
+
+* Add novelty fields to Network dataclass
+* Determine mutation frequency and common practices
+* Implement mutation for two simple networks
+
 ## ***📝 References***
 
-* [Efficient Evolution of Neural Network Topologies](https://nn.cs.utexas.edu/downloads/papers/stanley.cec02.pdf), *Kenneth O. Stanley and Risto Miikkulainen*
+* [Efficient Evolution of Neural Network Topologies](https://nn.cs.utexas.edu/downloads/papers/stanley.cec02.pdf), *Kenneth O. Stanley and Risto Miikkulainen, 2001*

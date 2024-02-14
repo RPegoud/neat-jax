@@ -6,13 +6,21 @@ import jax.numpy as jnp
 from neat_jax import ActivationState, Network
 
 
+def sigmoid(x) -> jnp.float32:
+    return 1 / (1 + jnp.exp(-x))
+
+
 def init(
     senders: jnp.ndarray,
     receivers: jnp.ndarray,
+    weights: jnp.ndarray,
     inputs: jnp.ndarray,
     node_types: jnp.ndarray,
     max_nodes: int,
 ) -> tuple[ActivationState, Network]:
+    """
+    Initializes the network and activation state for NEAT processing.
+    """
 
     senders = (
         (jnp.ones(max_nodes, dtype=jnp.int32) * -1).at[: len(senders)].set(senders)
@@ -20,6 +28,7 @@ def init(
     receivers = (
         (jnp.ones(max_nodes, dtype=jnp.int32) * -1).at[: len(receivers)].set(receivers)
     )
+    weights = (jnp.zeros(max_nodes, dtype=jnp.int32)).at[: len(weights)].set(weights)
 
     activations = jnp.zeros(max_nodes).at[: len(inputs)].set(inputs)
     activated_nodes = jnp.int32(activations > 0)
@@ -34,7 +43,7 @@ def init(
         Network(
             node_indices=jnp.arange(max_nodes, dtype=jnp.int32),
             node_types=node_types,
-            edges=jnp.ones(max_nodes),
+            weights=weights,
             senders=senders,
             receivers=receivers,
         ),
@@ -42,15 +51,21 @@ def init(
 
 
 def get_required_activations(net: Network, size: int) -> jnp.ndarray:
-    """
-    Returns the required number of activations for each node to fire.
+    """Calculates the number of activations each node requires to fire.
+
+    Iterates over the network's receivers to count the incoming connections for each node,
+    determining how many signals a node must receive before it can activate.
+
+    Returns:
+        An array where each element represents the required number of activations for the
+        corresponding node.
     """
 
     def _carry(required_activations: jnp.ndarray, receiver: int):
         return (
             jax.lax.cond(
                 receiver == -1,
-                lambda _: required_activations,
+                lambda _: required_activations,  # bypass this step for non-receiver nodes
                 lambda _: required_activations.at[receiver].add(1),
                 operand=None,
             ),
@@ -68,6 +83,14 @@ def get_active_connections(
     net: Network,
     max_nodes: int,
 ) -> tuple[jnp.ndarray, jnp.ndarray]:
+    """Identifies active connections based on the current activation state.
+
+    Filters the senders and receivers based on whether the sender nodes are currently active,
+    indicating which connections will transmit signals in this iteration.
+
+    Returns:
+        A tuple of arrays for active senders and their corresponding receivers.
+    """
 
     active_senders_indices = jnp.where(
         activation_state.toggled[net.senders] > 0,
@@ -84,10 +107,16 @@ def add_activations(
     senders: jnp.ndarray,
     receivers: jnp.ndarray,
     activation_state: ActivationState,
+    net: Network,
 ) -> ActivationState:
-    """
-    For given sender nodes, iteratively computes the activation
-    of receiver nodes while carrying the global activation state.
+    """Updates the activation values and counts for receiver nodes.
+
+    For each active connection, adds the sender's activation value to the receiver's
+    current value, increments the receiver's activation count, and deactivates the sender node
+    for the next step.
+
+    Returns:
+        Updated ActivationState reflecting the new activations and deactivations.
     """
 
     def _add_single_activation(activation_state: jnp.ndarray, x: tuple) -> jnp.ndarray:
@@ -99,11 +128,21 @@ def add_activations(
             Note: the deactivation of the sender nodes will only be effective at the
             end of the iteration (at the next step when computing which nodes should fire).
             """
-            activation_state, sender, receiver = val
+            activation_state, sender, receiver, weight = val
             values = activation_state.values
             activation_counts = activation_state.activation_counts
 
-            values = values.at[receiver].add(values[sender])
+            # conditionally apply the sigmoid function if
+            # the current node belongs to the hidden layers (node_type == 1)
+            sender_value = values.at[sender].get()
+            values = jax.lax.cond(
+                net.node_types.at[sender].get() == 1,
+                lambda _: values.at[sender].set(sigmoid(sender_value)),
+                lambda _: values,
+                operand=None,
+            )
+
+            values = values.at[receiver].add(values[sender] * weight)
             activation_counts = activation_counts.at[receiver].add(1)
             toggled = activation_state.toggled.at[sender].set(0)
             return (
@@ -117,23 +156,23 @@ def add_activations(
 
         def _bypass(val: tuple):
             """Bypasses the update for a given node."""
-            activation_state, _, _ = val
+            activation_state, *_ = val
             return (activation_state, None)
 
-        sender, receiver = x
+        sender, receiver, weight = x
 
         # nodes with activation -1 are not enabled and should not fire
         return jax.lax.cond(
             sender == -1,
             _bypass,
             _update_activation_state,
-            operand=(activation_state, sender, receiver),
+            operand=(activation_state, sender, receiver, weight),
         )
 
     activation_state, _ = jax.lax.scan(
         _add_single_activation,
         activation_state,
-        jnp.stack((senders, receivers), axis=1),
+        jnp.stack((senders, receivers, net.weights), axis=1),
     )
     return activation_state
 
@@ -143,9 +182,13 @@ def toggle_receivers(
     net: Network,
     max_nodes: int,
 ) -> ActivationState:
-    """
-    Returns an array of size ``max_neurons`` indicating which nodes have received
-    all necessary activations and should fire at the next step.
+    """Determines which nodes will be activated in the next iteration.
+
+    Compares the current activation counts against the required activations to identify
+    nodes that have received enough signals to fire.
+
+    Returns:
+        ActivationState with the `toggled` field updated to reflect nodes that will activate next.
     """
 
     def _update_toggle(val: tuple) -> jnp.ndarray:
@@ -156,7 +199,7 @@ def toggle_receivers(
         return positive_activation_counts & fully_activated
 
     def _terminate(val: tuple) -> jnp.ndarray:
-        """Disables all nodes, leading to termination of the forward pass."""
+        """Disables all nodes, ending of the forward pass."""
         return jnp.zeros(max_nodes, dtype=jnp.int32)
 
     required_activations = get_required_activations(net, max_nodes)
@@ -169,18 +212,29 @@ def toggle_receivers(
         operand=(activation_state, required_activations),
     )
 
-    return activation_state.replace(toggled=activated_nodes)
+    return activation_state.replace(
+        toggled=activated_nodes,
+    )
 
 
 @partial(jax.jit, static_argnames="max_nodes")
 def forward(
-    activation_state: ActivationState, net: Network, max_nodes
+    activation_state: ActivationState, net: Network, max_nodes: int
 ) -> ActivationState:
-    """
-    Computes a forward pass through an arbitrary Neat Network.
+    """Executes a forward pass through the NEAT network.
+
+    Repeatedly processes activations based on the current state, updating node activations
+    and toggles until no nodes are left to toggle.
+
+    Args:
+        max_nodes: The maximum number of nodes in the network, used to ensure consistent
+        array sizes.
+
+    Returns:
+        The final ActivationState after processing all activations.
     """
 
-    def _termination_fn(val: tuple) -> bool:
+    def _termination_condition(val: tuple) -> bool:
         """Iterate while some nodes are still toggled."""
         activation_state, _ = val
         return jnp.sum(activation_state.toggled) > 0
@@ -188,13 +242,13 @@ def forward(
     def _body_fn(val: tuple):
         activation_state, net = val
         senders, receivers = get_active_connections(activation_state, net, max_nodes)
-        activation_state = add_activations(senders, receivers, activation_state)
+        activation_state = add_activations(senders, receivers, activation_state, net)
         activation_state = toggle_receivers(activation_state, net, max_nodes)
 
         return activation_state, net
 
     activation_state, net = jax.lax.while_loop(
-        _termination_fn, _body_fn, (activation_state, net)
+        _termination_condition, _body_fn, (activation_state, net)
     )
 
     return activation_state

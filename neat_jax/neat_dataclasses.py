@@ -28,6 +28,7 @@ class Network:
             - `0`: Input node
             - `1`: Hidden node
             - `2`: Output node
+
         edges (jnp.ndarray): Weight of the connection between sender and receiver `i`
         senders (jnp.ndarray): Array of node indices used as inputs to receiver nodes
         receivers (jnp.ndarray): Array of node indices used as outputs to sender nodes
@@ -35,7 +36,7 @@ class Network:
 
     node_indices: jnp.ndarray
     node_types: jnp.ndarray
-    edges: jnp.ndarray
+    weights: jnp.ndarray
     senders: jnp.ndarray
     receivers: jnp.ndarray
 
