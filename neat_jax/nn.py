@@ -143,7 +143,7 @@ def add_activations(
                 operand=x,
             )
 
-        def _update_activation_state(val: tuple):
+        def _update_activation_state(val: tuple) -> ActivationState:
             """
             Adds the activation of a sender to a receiver's value and
             increments its activation count, then deactivates the sender node.

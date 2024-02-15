@@ -2,11 +2,8 @@
 # `neatJax`: Fast NeuroEvolution of Augmenting Topologies 🪸
 
 <center>
-    <img src="images/image.png" width="170" align="right"/>
-</center>
-<!-- <center>
     <img src="https://raw.githubusercontent.com/RPegoud/neat-jax/2d8fe31de24a1af26b90cab1722f6803c7d04567/images/Neat%20logo.svg?token=AOPYRH6UJEB6QXS5H26YVX3FZCJ26" width="170" align="right"/>
-</center> -->
+</center>
 
 <a href= "https://github.com/psf/black">
 <img src="https://img.shields.io/badge/code%20style-black-000000.svg" /></a>
