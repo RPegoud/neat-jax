@@ -53,15 +53,12 @@ class Network:
     weights: jnp.ndarray
     senders: jnp.ndarray
     receivers: jnp.ndarray
+    output_size: int
 
     @property
     def n_nodes(self) -> int:
         return len(self.nodes_indices)
 
     @property
-    def input_nodes(self) -> int:
-        return jnp.where(self.node_types == 0)[0]
-
-    @property
-    def output_nodes(self) -> int:
-        return jnp.where(self.node_types == 2)[0]
+    def node_types_counts(self) -> jnp.ndarray:
+        return jnp.bincount(self.node_types, length=3)

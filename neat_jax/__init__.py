@@ -1,7 +1,7 @@
 from .neat_dataclasses import ActivationState, Network
 from .nn import (
-    add_activations,
     forward,
+    forward_toggled_nodes,
     get_active_connections,
     get_required_activations,
     init,

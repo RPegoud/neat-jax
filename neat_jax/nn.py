@@ -14,6 +14,7 @@ def init(
     inputs: jnp.ndarray,
     node_types: jnp.ndarray,
     max_nodes: int,
+    output_size: int,
 ) -> tuple[ActivationState, Network]:
     """
     Initializes the network and activation state for NEAT processing.
@@ -49,6 +50,7 @@ def init(
             activation_indices=activation_indices,
             senders=senders,
             receivers=receivers,
+            output_size=output_size,
         ),
     )
 
@@ -106,7 +108,7 @@ def get_active_connections(
     return active_senders, active_receivers
 
 
-def add_activations(
+def forward_toggled_nodes(
     senders: jnp.ndarray,
     receivers: jnp.ndarray,
     activation_state: ActivationState,
@@ -242,9 +244,12 @@ def toggle_receivers(
     )
 
 
-@partial(jax.jit, static_argnames="max_nodes")
+@partial(jax.jit, static_argnames=("max_nodes", "output_size"))
 def forward(
-    activation_state: ActivationState, net: Network, max_nodes: int
+    activation_state: ActivationState,
+    net: Network,
+    max_nodes: int,
+    output_size: int,
 ) -> ActivationState:
     """Executes a forward pass through the NEAT network.
 
@@ -267,7 +272,9 @@ def forward(
     def _body_fn(val: tuple):
         activation_state, net = val
         senders, receivers = get_active_connections(activation_state, net, max_nodes)
-        activation_state = add_activations(senders, receivers, activation_state, net)
+        activation_state = forward_toggled_nodes(
+            senders, receivers, activation_state, net
+        )
         activation_state = toggle_receivers(activation_state, net, max_nodes)
 
         return activation_state, net
@@ -276,4 +283,7 @@ def forward(
         _termination_condition, _body_fn, (activation_state, net)
     )
 
-    return activation_state
+    output_nodes_indices = jnp.where(net.node_types == 2, size=output_size)
+    output = activation_state.values[output_nodes_indices][0]
+
+    return activation_state, output

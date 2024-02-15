@@ -20,14 +20,14 @@ Forward Pass:
 
 * [x] Add connection weights
 * [x] Add individual activation functions
-* [ ] Add conditional activation of output nodes, return output values
+* [x] Add conditional activation of output nodes, return output values
 * [ ] Test forward when a single neuron is linked to multiple receivers
 * [ ] Test forward pass on larger architectures
 
 Mutation:
 
 * [ ] Add novelty fields to Network dataclass
-* [ ] Determine mutation frequency and common practices
+* [ ] Determine mutation frequency and common practices (crossing, activations, ...)
 * [ ] Implement mutation for two simple networks
 
 ## ***📝 References***
