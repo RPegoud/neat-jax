@@ -57,7 +57,7 @@ class Network:
 
     @property
     def n_nodes(self) -> int:
-        return len(self.nodes_indices)
+        return len(self.node_indices)
 
     @property
     def node_types_counts(self) -> jnp.ndarray:
