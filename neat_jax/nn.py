@@ -7,7 +7,7 @@ import jax.numpy as jnp
 from neat_jax import ActivationState, Network
 
 
-def init(
+def make_network(
     senders: jnp.ndarray,
     receivers: jnp.ndarray,
     weights: jnp.ndarray,
@@ -30,7 +30,7 @@ def init(
     receivers = (
         (jnp.ones(max_nodes, dtype=jnp.int32) * -1).at[: len(receivers)].set(receivers)
     )
-    weights = (jnp.zeros(max_nodes, dtype=jnp.int32)).at[: len(weights)].set(weights)
+    weights = (jnp.zeros(max_nodes, dtype=jnp.float32)).at[: len(weights)].set(weights)
     activation_indices = (
         (jnp.zeros(max_nodes, dtype=jnp.int32))
         .at[: len(activation_indices)]

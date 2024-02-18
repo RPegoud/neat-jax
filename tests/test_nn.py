@@ -2,7 +2,7 @@ import chex
 import jax.numpy as jnp
 from absl.testing import parameterized
 
-from neat_jax import forward, get_required_activations, init
+from neat_jax import forward, get_required_activations, make_network
 
 # TODO:
 # add different activation functions within the network
@@ -52,7 +52,7 @@ class NetworkTests(chex.TestCase, parameterized.TestCase):
         ),
     )
     def test_init(self, params: dict, expected: dict):
-        activation_state, net = init(**params)
+        activation_state, net = make_network(**params)
 
         # --- Test init ---
         chex.assert_trees_all_equal_shapes(

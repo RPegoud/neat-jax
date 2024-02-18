@@ -1,3 +1,4 @@
+from .mutations import Mutations
 from .neat_dataclasses import ActivationState, Network
 from .nn import (
     forward,
@@ -5,7 +6,7 @@ from .nn import (
     get_activation,
     get_active_connections,
     get_required_activations,
-    init,
+    make_network,
     toggle_receivers,
 )
 from .utils import plot_network
