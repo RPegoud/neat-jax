@@ -24,11 +24,21 @@ Forward Pass:
 * [x] Test forward when a single neuron is linked to multiple receivers
 * [x] Test forward pass on larger architectures
 
-Mutation:
+Mutations:
+
+* [x] Determine mutation frequency and common practices
+* [ ] Implement the following mutations:
+  * [x] Weight shift
+  * [ ] Weight reset
+  * [ ] Add connection
+  * [ ] Add node
+* [ ] Wrap all mutations in a single function
+
+Crossing:
 
 * [ ] Add novelty fields to Network dataclass
-* [ ] Determine mutation frequency and common practices (crossing, activations, ...)
-* [ ] Implement mutation for two simple networks
+* [ ] Implement crossing for two simple networks
+* [ ] Create a Species dataclass
 
 ## ***📝 References***
 
