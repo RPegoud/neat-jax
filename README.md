@@ -21,8 +21,8 @@ Forward Pass:
 * [x] Add connection weights
 * [x] Add individual activation functions
 * [x] Add conditional activation of output nodes, return output values
-* [ ] Test forward when a single neuron is linked to multiple receivers
-* [ ] Test forward pass on larger architectures
+* [x] Test forward when a single neuron is linked to multiple receivers
+* [x] Test forward pass on larger architectures
 
 Mutation:
 
