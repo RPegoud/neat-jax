@@ -122,9 +122,20 @@ def get_active_connections(
     return active_senders, active_receivers
 
 
-def activation_fn(activation_index: int, x: float) -> jnp.float32:
+def get_activation(activation_index: int, x: float) -> jnp.float32:
     """
-    Given an index, selects a function and computes the activation of a scalar.
+    Given an index, selects an activation function and computes `activation(x)`.
+
+    ```python
+        0: 1 / (1 + jnp.exp(-x)),  # sigmoid
+        1: jnp.divide(1, x),  # inverse
+        2: jnp.sinh(x) / jnp.cosh(x),  # hyperbolic cosine
+        3: jnp.float32(jnp.maximum(0, x)),  # relu
+        4: jnp.float32(jnp.abs(x)),  # absolute value
+        5: jnp.sin(x),  # sine
+        6: jnp.exp(jnp.square(-x)),  # gaussian
+        7: jnp.float32(jnp.sign(x)),  # step
+        ```
     """
     return jax.lax.switch(
         activation_index,
@@ -178,7 +189,7 @@ def forward_toggled_nodes(
             values = jax.lax.cond(
                 net.node_types.at[sender].get() == 1,
                 lambda _: values.at[sender].set(
-                    activation_fn(activation_index, x=sender_value)
+                    get_activation(activation_index, x=sender_value)
                 ),
                 lambda _: values,
                 operand=None,
@@ -309,14 +320,15 @@ def forward(
         _termination_condition, _body_fn, (activation_state, net)
     )
 
-    output_nodes_indices = jnp.where(net.node_types == 2, size=output_size)
-    output = activation_state.values[output_nodes_indices]
+    output_nodes_indices = jnp.where(net.node_types == 2, size=output_size)[0]
+    activation_functions_indices = net.activation_indices.at[output_nodes_indices].get()
+    outputs = activation_state.values.at[output_nodes_indices].get()
 
-    # output = jax.lax.cond(
-    #     activate_final,
-    #     lambda _: jax.vmap(activation_fn)(jnp.zeros(len(output)), output),
-    #     lambda _: output,
-    #     operand=None,
-    # )
+    outputs = jax.lax.cond(
+        activate_final,
+        lambda _: jax.vmap(get_activation)(activation_functions_indices, outputs),
+        lambda _: outputs,
+        operand=None,
+    )
 
-    return activation_state, output
+    return activation_state, outputs
