@@ -15,6 +15,10 @@ class ActivationState:
     values: jnp.ndarray
     toggled: jnp.ndarray
     activation_counts: jnp.ndarray
+    has_fired: jnp.ndarray
+
+    def __repr__(self) -> str:
+        return f"Values: {self.values}\n Toggled: {self.toggled}\n Activation Counts: {self.activation_counts}"
 
 
 @struct.dataclass
@@ -60,5 +64,5 @@ class Network:
         return len(self.node_indices)
 
     @property
-    def node_types_counts(self) -> jnp.ndarray:
+    def node_type_counts(self) -> jnp.ndarray:
         return jnp.bincount(self.node_types, length=3)

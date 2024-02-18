@@ -4,7 +4,6 @@ import chex
 import jax
 import jax.numpy as jnp
 
-
 from neat_jax import ActivationState, Network
 
 
@@ -41,12 +40,14 @@ def init(
     activations = jnp.zeros(max_nodes).at[: len(inputs)].set(inputs)
     activated_nodes = jnp.int32(activations > 0)
     activation_counts = jnp.zeros(max_nodes, dtype=jnp.int32)
+    has_fired = jnp.zeros(max_nodes, dtype=jnp.int32)
 
     return (
         ActivationState(
             values=activations,
             toggled=activated_nodes,
             activation_counts=activation_counts,
+            has_fired=has_fired,
         ),
         Network(
             node_indices=jnp.arange(max_nodes, dtype=jnp.int32),
@@ -105,11 +106,14 @@ def get_active_connections(
     active_senders_indices = jnp.where(
         activation_state.toggled[net.senders] > 0,
         size=max_nodes,
-        # fill_value=-1,
-        fill_value=max_nodes + 1,
+        fill_value=max_nodes + 1,  # fill with out-of-range values
     )[0]
     active_senders = jnp.take(
-        net.senders, active_senders_indices, axis=0, fill_value=-1
+        net.senders,
+        active_senders_indices,
+        axis=0,
+        fill_value=-1,  # out-of-range values are converted to -1
+        # which effectively ignores senders and receivers that are currently not toggled
     )
     active_receivers = jnp.take(
         net.receivers, active_senders_indices, axis=0, fill_value=-1
@@ -183,11 +187,13 @@ def forward_toggled_nodes(
             values = values.at[receiver].add(values[sender] * weight)
             activation_counts = activation_counts.at[receiver].add(1)
             toggled = activation_state.toggled.at[sender].set(0)
+            has_fired = activation_state.has_fired.at[sender].set(1)
             return (
                 activation_state.replace(
                     values=values,
                     activation_counts=activation_counts,
                     toggled=toggled,
+                    has_fired=has_fired,
                 ),
                 None,
             )
@@ -230,11 +236,19 @@ def toggle_receivers(
     """
 
     def _update_toggle(val: tuple) -> jnp.ndarray:
-        """Returns a mask designating nodes to activate at the next step."""
+        """
+        Returns a mask designating nodes to activate at the next step.
+        A node will be activated at next step if:
+            * It has not fired previously
+            * (and) It has received values from all its senders
+        TODO: positive activation count and has not fired are probably redundant
+        try keeping only has not fired
+        """
         activation_state, required_activations = val
         positive_activation_counts = jnp.int32(activation_state.activation_counts > 0)
-        fully_activated = activation_state.activation_counts == required_activations
-        return positive_activation_counts & fully_activated
+        has_req_activations = activation_state.activation_counts == required_activations
+        has_not_fired = jnp.invert(activation_state.has_fired)
+        return positive_activation_counts & has_req_activations & has_not_fired
 
     def _terminate(val: tuple) -> jnp.ndarray:
         """Disables all nodes, ending of the forward pass."""

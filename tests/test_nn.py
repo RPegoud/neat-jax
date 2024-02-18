@@ -51,7 +51,7 @@ class NetworkTests(chex.TestCase, parameterized.TestCase):
             net.node_indices, net.receivers, net.senders, net.weights
         )
         assert net.n_nodes == expected["n_nodes"]
-        chex.assert_trees_all_equal(net.node_types_counts, expected["type_counts"])
+        chex.assert_trees_all_equal(net.node_type_counts, expected["type_counts"])
 
         assert jnp.all(activation_state.activation_counts == 0)
         assert jnp.sum(activation_state.toggled) == expected["n_inputs"]
