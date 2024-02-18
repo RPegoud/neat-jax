@@ -1,5 +1,6 @@
 from functools import partial
 
+import chex
 import jax
 import jax.numpy as jnp
 
@@ -20,6 +21,9 @@ def init(
     Initializes the network and activation state for NEAT processing.
     """
 
+    chex.assert_trees_all_equal_shapes(senders, receivers, weights)
+    chex.assert_trees_all_equal_shapes(activation_indices, node_types)
+
     senders = (
         (jnp.ones(max_nodes, dtype=jnp.int32) * -1).at[: len(senders)].set(senders)
     )
@@ -36,12 +40,14 @@ def init(
     activations = jnp.zeros(max_nodes).at[: len(inputs)].set(inputs)
     activated_nodes = jnp.int32(activations > 0)
     activation_counts = jnp.zeros(max_nodes, dtype=jnp.int32)
+    has_fired = jnp.zeros(max_nodes, dtype=jnp.int32)
 
     return (
         ActivationState(
             values=activations,
             toggled=activated_nodes,
             activation_counts=activation_counts,
+            has_fired=has_fired,
         ),
         Network(
             node_indices=jnp.arange(max_nodes, dtype=jnp.int32),
@@ -100,12 +106,40 @@ def get_active_connections(
     active_senders_indices = jnp.where(
         activation_state.toggled[net.senders] > 0,
         size=max_nodes,
-        fill_value=-1,
+        fill_value=max_nodes + 1,  # fill with out-of-range values
     )[0]
-    active_senders = jnp.take(net.senders, active_senders_indices, axis=0)
-    active_receivers = jnp.take(net.receivers, active_senders_indices, axis=0)
+    active_senders = jnp.take(
+        net.senders,
+        active_senders_indices,
+        axis=0,
+        fill_value=-1,  # out-of-range values are converted to -1
+        # which effectively ignores senders and receivers that are currently not toggled
+    )
+    active_receivers = jnp.take(
+        net.receivers, active_senders_indices, axis=0, fill_value=-1
+    )
 
     return active_senders, active_receivers
+
+
+def activation_fn(activation_index: int, x: float) -> jnp.float32:
+    """
+    Given an index, selects a function and computes the activation of a scalar.
+    """
+    return jax.lax.switch(
+        activation_index,
+        [
+            lambda x: 1 / (1 + jnp.exp(-x)),  # sigmoid
+            lambda x: jnp.divide(1, x),  # inverse
+            lambda x: jnp.sinh(x) / jnp.cosh(x),  # hyperbolic cosine
+            lambda x: jnp.float32(jnp.maximum(0, x)),  # relu
+            lambda x: jnp.float32(jnp.abs(x)),  # absolute value
+            lambda x: jnp.sin(x),  # sine
+            lambda x: jnp.exp(jnp.square(-x)),  # gaussian
+            lambda x: jnp.float32(jnp.sign(x)),  # step
+        ],
+        operand=x,
+    )
 
 
 def forward_toggled_nodes(
@@ -126,25 +160,6 @@ def forward_toggled_nodes(
 
     def _add_single_activation(activation_state: jnp.ndarray, x: tuple) -> jnp.ndarray:
 
-        def _activation_fn(activation_index: int, x: float) -> jnp.float32:
-            """
-            Given an index, selects a function and computes the activation of a scalar.
-            """
-            return jax.lax.switch(
-                activation_index,
-                [
-                    lambda x: 1 / (1 + jnp.exp(-x)),  # sigmoid
-                    lambda x: jnp.divide(1, x),  # inverse
-                    lambda x: jnp.sinh(x) / jnp.cosh(x),  # hyperbolic cosine
-                    lambda x: jnp.float32(jnp.maximum(0, x)),  # relu
-                    lambda x: jnp.float32(jnp.abs(x)),  # absolute value
-                    lambda x: jnp.sin(x),  # sine
-                    lambda x: jnp.exp(jnp.square(-x)),  # gaussian
-                    lambda x: jnp.float32(jnp.sign(x)),  # step
-                ],
-                operand=x,
-            )
-
         def _update_activation_state(val: tuple) -> ActivationState:
             """
             Adds the activation of a sender to a receiver's value and
@@ -163,7 +178,7 @@ def forward_toggled_nodes(
             values = jax.lax.cond(
                 net.node_types.at[sender].get() == 1,
                 lambda _: values.at[sender].set(
-                    _activation_fn(activation_index, x=sender_value)
+                    activation_fn(activation_index, x=sender_value)
                 ),
                 lambda _: values,
                 operand=None,
@@ -172,11 +187,13 @@ def forward_toggled_nodes(
             values = values.at[receiver].add(values[sender] * weight)
             activation_counts = activation_counts.at[receiver].add(1)
             toggled = activation_state.toggled.at[sender].set(0)
+            has_fired = activation_state.has_fired.at[sender].set(1)
             return (
                 activation_state.replace(
                     values=values,
                     activation_counts=activation_counts,
                     toggled=toggled,
+                    has_fired=has_fired,
                 ),
                 None,
             )
@@ -219,11 +236,19 @@ def toggle_receivers(
     """
 
     def _update_toggle(val: tuple) -> jnp.ndarray:
-        """Returns a mask designating nodes to activate at the next step."""
+        """
+        Returns a mask designating nodes to activate at the next step.
+        A node will be activated at next step if:
+            * It has not fired previously
+            * (and) It has received values from all its senders
+        TODO: positive activation count and has not fired are probably redundant
+        try keeping only has not fired
+        """
         activation_state, required_activations = val
         positive_activation_counts = jnp.int32(activation_state.activation_counts > 0)
-        fully_activated = activation_state.activation_counts == required_activations
-        return positive_activation_counts & fully_activated
+        has_req_activations = activation_state.activation_counts == required_activations
+        has_not_fired = jnp.invert(activation_state.has_fired)
+        return positive_activation_counts & has_req_activations & has_not_fired
 
     def _terminate(val: tuple) -> jnp.ndarray:
         """Disables all nodes, ending of the forward pass."""
@@ -250,6 +275,7 @@ def forward(
     net: Network,
     max_nodes: int,
     output_size: int,
+    activate_final: bool = False,
 ) -> ActivationState:
     """Executes a forward pass through the NEAT network.
 
@@ -284,6 +310,13 @@ def forward(
     )
 
     output_nodes_indices = jnp.where(net.node_types == 2, size=output_size)
-    output = activation_state.values[output_nodes_indices][0]
+    output = activation_state.values[output_nodes_indices]
+
+    # output = jax.lax.cond(
+    #     activate_final,
+    #     lambda _: jax.vmap(activation_fn)(jnp.zeros(len(output)), output),
+    #     lambda _: output,
+    #     operand=None,
+    # )
 
     return activation_state, output

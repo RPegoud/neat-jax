@@ -7,3 +7,4 @@ from .nn import (
     init,
     toggle_receivers,
 )
+from .utils import plot_network
