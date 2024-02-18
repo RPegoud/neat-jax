@@ -29,9 +29,9 @@ Mutations:
 * [x] Determine mutation frequency and common practices
 * [ ] Implement the following mutations:
   * [x] Weight shift
-  * [ ] Weight reset
-  * [ ] Add connection
+  * [x] Weight reset
   * [ ] Add node
+  * [ ] Add connection
 * [ ] Wrap all mutations in a single function
 
 Crossing:

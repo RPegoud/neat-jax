@@ -18,7 +18,9 @@ class ActivationState:
     has_fired: jnp.ndarray
 
     def __repr__(self) -> str:
-        return f"Values: {self.values}\n Toggled: {self.toggled}\n Activation Counts: {self.activation_counts}"
+        for atr in ActivationState.__dataclass_fields__.keys():
+            print(f"{atr}: {self.__getattribute__(atr)}")
+        return ""
 
 
 @struct.dataclass
@@ -58,6 +60,11 @@ class Network:
     senders: jnp.ndarray
     receivers: jnp.ndarray
     output_size: int
+
+    def __repr__(self) -> str:
+        for atr in Network.__dataclass_fields__.keys():
+            print(f"{atr}: {self.__getattribute__(atr)}")
+        return ""
 
     @property
     def n_nodes(self) -> int:

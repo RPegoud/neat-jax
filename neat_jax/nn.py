@@ -170,6 +170,7 @@ def forward_toggled_nodes(
     """
 
     def _add_single_activation(activation_state: jnp.ndarray, x: tuple) -> jnp.ndarray:
+        """Conditionally apply the update function if the current node is enabled."""
 
         def _update_activation_state(val: tuple) -> ActivationState:
             """
@@ -216,12 +217,18 @@ def forward_toggled_nodes(
 
         sender, receiver, weight, activation_index = x
 
-        # nodes with activation -1 are not enabled and should not fire
+        # nodes with negative indices are disabled and should not fire
         return jax.lax.cond(
-            sender == -1,
+            sender < 0,
             _bypass,
             _update_activation_state,
-            operand=(activation_state, sender, receiver, weight, activation_index),
+            operand=(
+                activation_state,
+                jnp.int32(sender),
+                jnp.int32(receiver),
+                weight,
+                jnp.int32(activation_index),
+            ),
         )
 
     activation_state, _ = jax.lax.scan(
