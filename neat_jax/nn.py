@@ -25,10 +25,14 @@ def make_network(
     chex.assert_trees_all_equal_shapes(activation_indices, node_types)
 
     senders = (
-        (jnp.ones(max_nodes, dtype=jnp.int32) * -1).at[: len(senders)].set(senders)
+        (jnp.ones(max_nodes, dtype=jnp.int32) * -max_nodes)
+        .at[: len(senders)]
+        .set(senders)
     )
     receivers = (
-        (jnp.ones(max_nodes, dtype=jnp.int32) * -1).at[: len(receivers)].set(receivers)
+        (jnp.ones(max_nodes, dtype=jnp.int32) * -max_nodes)
+        .at[: len(receivers)]
+        .set(receivers)
     )
     weights = (jnp.zeros(max_nodes, dtype=jnp.float32)).at[: len(weights)].set(weights)
     activation_indices = (
@@ -37,6 +41,11 @@ def make_network(
         .set(activation_indices)
     )
 
+    node_types = (
+        (jnp.ones(max_nodes, dtype=jnp.int32) * 3)  # disabled nodes have index 3
+        .at[: len(node_types)]
+        .set(node_types)
+    )
     activations = jnp.zeros(max_nodes).at[: len(inputs)].set(inputs)
     activated_nodes = jnp.int32(activations > 0)
     activation_counts = jnp.zeros(max_nodes, dtype=jnp.int32)
@@ -75,7 +84,7 @@ def get_required_activations(net: Network, size: int) -> jnp.ndarray:
     def _carry(required_activations: jnp.ndarray, receiver: int):
         return (
             jax.lax.cond(
-                receiver == -1,
+                receiver < 0,
                 lambda _: required_activations,  # bypass this step for non-receiver nodes
                 lambda _: required_activations.at[receiver].add(1),
                 operand=None,
