@@ -152,7 +152,9 @@ class Mutations:
             # sample a connection to modify
             valid_senders = jnp.int32(net.node_types < 2)  # input and hidden nodes
             selected = random.choice(
-                node_key, valid_senders, p=valid_senders / valid_senders.sum()
+                node_key,
+                jnp.arange(max_nodes) * valid_senders,
+                p=valid_senders / valid_senders.sum(),
             )
             selected_sender = net.senders[selected]
             selected_receiver = net.receivers[selected]

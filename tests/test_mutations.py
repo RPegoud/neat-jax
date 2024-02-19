@@ -5,7 +5,7 @@ from jax import random
 
 from neat_jax import Mutations, make_network
 
-# TODO: add second topology and .5 mutation probability
+# TODO: add second topology
 
 topology_config_0 = {
     "max_nodes": 10,
@@ -18,6 +18,12 @@ topology_config_0 = {
     "output_size": 1,
 }
 mutation_config_null = {
+    "weight_shift_rate": 0.0,
+    "weight_mutation_rate": 0.0,
+    "add_node_rate": 0.0,
+    "add_connection_rate": 0.0,
+}
+mutation_config_0_5 = {
     "weight_shift_rate": 0.0,
     "weight_mutation_rate": 0.0,
     "add_node_rate": 0.0,
@@ -73,17 +79,47 @@ class MutationTests(chex.TestCase, parameterized.TestCase):
                     [-0.26105583, 0.00338528, 0.10863334, -0.1480299, 0, 0, 0, 0, 0, 0]
                 ),
                 "added_node_weights": jnp.array(
-                    [1.0, 0.0, 1.0, 1.0, 0.12636864, -0.00423024, 0.0, 0.0, 0.0, 0.0]
+                    [0.0, 1.0, 1.0, 1.0, 0.12636864, -0.00423024, 0.0, 0.0, 0.0, 0.0]
                 ),
                 "added_nodes_senders": jnp.concatenate(
                     [
-                        jnp.array([0, -1, 2, 4, 1, 5]),
+                        jnp.array([0, 1, 2, 4, 0, 5]),
                         jnp.repeat(jnp.array([-topology_config_0["max_nodes"]]), 4),
                     ]
                 ),
                 "added_nodes_receivers": jnp.concatenate(
                     [
-                        jnp.array([4, -4, 3, 3, 5, 4]),
+                        jnp.array([-4, 4, 3, 3, 5, 4]),
+                        jnp.repeat(jnp.array([-topology_config_0["max_nodes"]]), 4),
+                    ]
+                ),
+                "added_nodes_node_types": jnp.array([0, 0, 0, 2, 1, 1, 3, 3, 3, 3]),
+            },
+        ),
+        (
+            "topology_0__0.5_mutations",
+            topology_config_0,
+            mutation_config_certain,
+            {"seed": 1},
+            {
+                "shifted_weights": jnp.array(
+                    [0.9356227, 1.0769619, 0.9701904, 1.0478588, 0, 0, 0, 0, 0, 0]
+                ),
+                "mutated_weights": jnp.array(
+                    [-0.06437729, 0.0769619, -0.02980961, 0.04785879, 0, 0, 0, 0, 0, 0]
+                ),
+                "added_node_weights": jnp.array(
+                    [1.0, 1.0, 0.0, 1.0, -0.00611208, -0.10968596, 0.0, 0.0, 0.0, 0.0]
+                ),
+                "added_nodes_senders": jnp.concatenate(
+                    [
+                        jnp.array([0, 1, -2, 4, 2, 5]),
+                        jnp.repeat(jnp.array([-topology_config_0["max_nodes"]]), 4),
+                    ]
+                ),
+                "added_nodes_receivers": jnp.concatenate(
+                    [
+                        jnp.array([4, 4, -3, 3, 5, 3]),
                         jnp.repeat(jnp.array([-topology_config_0["max_nodes"]]), 4),
                     ]
                 ),
