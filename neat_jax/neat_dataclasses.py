@@ -31,9 +31,12 @@ class Network:
     Attributes:
         node_indices (jnp.ndarray): Index of each node
         node_types (jnp.ndarray): Type of each node:
-            - `0`: Input node
-            - `1`: Hidden node
-            - `2`: Output node
+        ```
+        - 0: Input node
+        - 1: Hidden node
+        - 2: Output node
+        - 3: Disabled or uninitialized node
+        ```
 
         activation_indices (jnp.ndarray): Mapping index of the activation function used
         by node `i`:
@@ -71,5 +74,15 @@ class Network:
         return len(self.node_indices)
 
     @property
+    def n_enabled_connections(self) -> jnp.int32:
+        return jnp.int32(sum(self.senders > 0))
+
+    @property
+    def n_enabled_nodes(
+        self,
+    ) -> jnp.int32:  # TODO: check if this computation is jit-compatible
+        return jnp.max(jnp.concatenate([self.senders, self.receivers]))
+
+    @property
     def node_type_counts(self) -> jnp.ndarray:
-        return jnp.bincount(self.node_types, length=3)
+        return jnp.bincount(self.node_types, length=4)

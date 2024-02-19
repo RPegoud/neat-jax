@@ -4,11 +4,11 @@ from absl.testing import parameterized
 
 from neat_jax import forward, get_required_activations, make_network
 
-# TODO:
-# add different activation functions within the network
+# TODO: test different activation functions within the network
 
 
 class NetworkTests(chex.TestCase, parameterized.TestCase):
+    @chex.variants(with_jit=True, without_jit=True)
     @parameterized.named_parameters(
         (
             "topology_0",
@@ -24,7 +24,7 @@ class NetworkTests(chex.TestCase, parameterized.TestCase):
             },
             {
                 "n_nodes": 20,
-                "type_counts": jnp.array([3, 1, 1]),
+                "type_counts": jnp.array([3, 1, 1, 15]),
                 "n_inputs": 3,
                 "output_wo_activation": jnp.array([0.985835]),
                 "output_w_activation": jnp.array([0.7282645]),
@@ -44,14 +44,14 @@ class NetworkTests(chex.TestCase, parameterized.TestCase):
             },
             {
                 "n_nodes": 30,
-                "type_counts": jnp.array([3, 2, 2]),
+                "type_counts": jnp.array([3, 2, 2, 23]),
                 "n_inputs": 3,
                 "output_wo_activation": jnp.array([1.3127818, 0.69270194]),
                 "output_w_activation": jnp.array([0.7879783, 0.6665677]),
             },
         ),
     )
-    def test_init(self, params: dict, expected: dict):
+    def test_nn(self, params: dict, expected: dict):
         activation_state, net = make_network(**params)
 
         # --- Test init ---
@@ -66,7 +66,9 @@ class NetworkTests(chex.TestCase, parameterized.TestCase):
         assert jnp.sum(activation_state.values) == jnp.sum(params["inputs"])
 
         # --- Test forward ---
-        activation_state, outputs_wo_activation = forward(
+        activation_state, outputs_wo_activation = self.variant(
+            forward, static_argnames=("max_nodes", "output_size")
+        )(
             activation_state,
             net,
             params["max_nodes"],
@@ -85,7 +87,9 @@ class NetworkTests(chex.TestCase, parameterized.TestCase):
             outputs_wo_activation, expected["output_wo_activation"]
         )
 
-        activation_state, outputs_w_activation = forward(
+        activation_state, outputs_w_activation = self.variant(
+            forward, static_argnames=("max_nodes", "output_size")
+        )(
             activation_state,
             net,
             params["max_nodes"],
