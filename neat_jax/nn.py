@@ -268,14 +268,12 @@ def toggle_receivers(
         A node will be activated at next step if:
             * It has not fired previously
             * (and) It has received values from all its senders
-        TODO: positive activation count and has not fired are probably redundant
         try keeping only has not fired
         """
         activation_state, required_activations = val
-        positive_activation_counts = jnp.int32(activation_state.activation_counts > 0)
         has_req_activations = activation_state.activation_counts == required_activations
         has_not_fired = jnp.invert(activation_state.has_fired)
-        return positive_activation_counts & has_req_activations & has_not_fired
+        return has_req_activations & has_not_fired
 
     def _terminate(val: tuple) -> jnp.ndarray:
         """Disables all nodes, ending of the forward pass."""

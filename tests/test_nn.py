@@ -4,8 +4,7 @@ from absl.testing import parameterized
 
 from neat_jax import forward, get_required_activations, make_network
 
-# TODO:
-# test different activation functions within the network
+# TODO: test different activation functions within the network
 
 
 class NetworkTests(chex.TestCase, parameterized.TestCase):
