@@ -60,14 +60,16 @@ class Mutations:
 
         eps_key, mutate_key = random.split(key, num=2)
         epsilons = random.normal(eps_key, shape=(self.max_nodes,)) * scale
-        mutate_i = jnp.bool_(
-            random.choice(mutate_key, jnp.array([0, 1]), shape=(self.max_nodes,))
+        mutate_i = (
+            random.uniform(mutate_key, shape=(self.max_nodes,)) < self.weight_shift_rate
         )
         shifted_weights = jax.vmap(_single_shift)(net.weights, epsilons, mutate_i)
         return net.replace(weights=shifted_weights)
 
     @partial(jax.jit, static_argnums=(0))
-    def weight_mutation(self, net: Network, key: random.PRNGKey, scale: float = 0.1):
+    def weight_mutation(
+        self, net: Network, key: random.PRNGKey, scale: float = 0.1
+    ) -> Network:
         """
         Randomly mutates connections from the network by sampling new weights from the normal distribution.
 
@@ -108,8 +110,9 @@ class Mutations:
 
         sample_key, mutate_key = random.split(key, num=2)
         new_values = random.normal(sample_key, shape=(self.max_nodes,)) * scale
-        mutate_i = jnp.bool_(
-            random.choice(mutate_key, jnp.array([0, 1]), shape=(self.max_nodes,))
+        mutate_i = (
+            random.uniform(mutate_key, shape=(self.max_nodes,))
+            < self.weight_mutation_rate
         )
         mutated_weights = jax.vmap(_single_mutation)(net.weights, new_values, mutate_i)
         return net.replace(weights=mutated_weights)
@@ -201,12 +204,22 @@ class Mutations:
                 activation_indices=activation_indices,
             )
 
+        def _bypass_fn(net: Network, key, max_nodes, scale_weights) -> Network:
+            """Bypasses the mutation function depending on the `mutate` flag."""
+            return net
+
         # this assertion is not jittable
         assert (
             sum(net.node_types == 3) >= 2
         ), "Not enough space to add new nodes to the network"
 
-        return _mutate_fn(net, key, self.max_nodes, scale_weights)
+        mutate = random.uniform(key) < self.add_node_rate
+        return jax.lax.cond(
+            mutate,
+            lambda _: _mutate_fn(net, key, self.max_nodes, scale_weights),
+            lambda _: _bypass_fn(net, key, self.max_nodes, scale_weights),
+            operand=None,
+        )
 
     def add_connection(
         net: Network,
