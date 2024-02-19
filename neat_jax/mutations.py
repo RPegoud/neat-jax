@@ -146,7 +146,6 @@ class Mutations:
             net: Network, key: random.PRNGKey, max_nodes: int, scale_weights: float
         ):
             node_key, weight_key, activation_key = random.split(key, num=3)
-
             new_node_index = net.n_enabled_nodes + 1
 
             # sample a connection to modify

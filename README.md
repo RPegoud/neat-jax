@@ -30,7 +30,7 @@ Mutations:
 * [ ] Implement the following mutations:
   * [x] Weight shift
   * [x] Weight reset
-  * [ ] Add node
+  * [x] Add node
   * [ ] Add connection
 * [ ] Wrap all mutations in a single function
 
@@ -39,6 +39,7 @@ Crossing:
 * [ ] Add novelty fields to Network dataclass
 * [ ] Implement crossing for two simple networks
 * [ ] Create a Species dataclass
+* [ ] Define a distance metrics between networks to cluster species
 
 ## ***📝 References***
 
