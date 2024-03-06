@@ -181,7 +181,7 @@ def forward_toggled_nodes(
     """
 
     def _add_single_activation(activation_state: jnp.ndarray, x: tuple) -> jnp.ndarray:
-        """Conditionally apply the update function if the current node is enabled."""
+        """Conditionally applies the update function if the current node is enabled."""
 
         def _update_activation_state(val: tuple) -> ActivationState:
             """
@@ -333,6 +333,10 @@ def forward(
 
         return activation_state, net
 
+    # reset the activation state from previous forward passes
+    input_values = jnp.int32(net.node_types == 0) * activation_state.values
+    activation_state = ActivationState.reset(input_values, max_nodes)
+
     activation_state, net = jax.lax.while_loop(
         _termination_condition, _body_fn, (activation_state, net)
     )
@@ -351,8 +355,25 @@ def forward(
     return activation_state, outputs
 
 
-def forward_single_depth(senders, receivers, activation_state, net):
+def forward_single_depth(senders, receivers, activation_state):
+    """
+    Updates the depth of each node in the network based on the current activation state.
+
+    Iterates through each active connection and updates the depth of receiver nodes
+    based on the depth of their sender nodes.
+
+    Args:
+        * senders (jnp.ndarray): An array of sender node indices.
+        * receivers (jnp.ndarray): An array of receiver node indices corresponding to senders.
+        * activation_state (ActivationState): The current state of the network activations,
+            including node depths.
+
+    Returns:
+        ActivationState: The updated activation state with potentially modified node depths.
+    """
+
     def _add_single_depth(activation_state: jnp.ndarray, x: tuple) -> jnp.ndarray:
+        """Conditionally applies the update function if the current node is enabled."""
 
         def _update_depth(val: tuple) -> ActivationState:
             activation_state, sender, receiver = val
@@ -392,11 +413,7 @@ def forward_single_depth(senders, receivers, activation_state, net):
             sender < 0,
             _bypass,
             _update_depth,
-            operand=(
-                activation_state,
-                jnp.int32(sender),
-                jnp.int32(receiver),
-            ),
+            operand=(activation_state, jnp.int32(sender), jnp.int32(receiver)),
         )
 
     activation_state, _ = jax.lax.scan(
@@ -413,17 +430,22 @@ def get_depth(
     net: Network,
     max_nodes: int,
 ) -> tuple[ActivationState]:
+    """
+    Computes the depth of each node in the network by performing a forward pass simulation.
 
-    def _initialize_depths(net: Network) -> jnp.ndarray:
-        """
-        Returns an array containing initial values of node depths.
-            - Input nodes: 0
-            - Hidden nodes: 1 (to be computed)
-            - Output nodes: ``max_nodes`` (maximal value)
-            - Deactivated nodes: -1
-        """
-        depth_types = jnp.array([0, 1, max_nodes, -1])
-        return jax.tree_map(lambda x: depth_types[x], net.node_types)
+    Starts with input nodes having their depths set based on initial activation values,
+    then iteratively updates the depths of connected nodes. This process repeats until
+    no more updates occur, ensuring that the depth of each node reflects the longest path
+    from any input node.
+
+    Args:
+        activation_state (ActivationState): The initial state of the network activations.
+        net (Network): The network structure containing sender and receiver connections.
+        max_nodes (int): The total number of nodes in the network, used for array sizes.
+
+    Returns:
+        ActivationState: The updated activation state with the final computed node depths.
+    """
 
     def _termination_condition(val: tuple) -> bool:
         """Iterate while some nodes are still toggled."""
@@ -433,14 +455,14 @@ def get_depth(
     def _body_fn(val: tuple):
         activation_state, net = val
         senders, receivers = get_active_connections(activation_state, net, max_nodes)
-        activation_state = forward_single_depth(
-            senders, receivers, activation_state, net
-        )
+        activation_state = forward_single_depth(senders, receivers, activation_state)
         activation_state = toggle_receivers(activation_state, net, max_nodes)
 
         return activation_state, net
 
-    activation_state.replace(node_depths=_initialize_depths(net))
+    input_values = jnp.int32(net.node_types == 0) * activation_state.values
+    activation_state = ActivationState.reset(input_values, max_nodes)
+
     activation_state, net = jax.lax.while_loop(
         _termination_condition, _body_fn, (activation_state, net)
     )

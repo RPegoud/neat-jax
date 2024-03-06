@@ -31,6 +31,28 @@ class ActivationState:
             print(f"{atr}: {self.__getattribute__(atr)}")
         return ""
 
+    @staticmethod
+    def reset(input_values: jnp.ndarray, max_nodes: int) -> "ActivationState":
+        """
+        Resets the ActivationState for a forward pass or a depth scan.
+
+        Args:
+            input_values (jnp.ndarray): The activation values of the network's input nodes
+            max_nodes (int): The maximum capacity of the network
+
+        Returns:
+            ActivationState: The reset ActivationState
+        """
+        assert len(input_values) == max_nodes
+        return ActivationState(
+            values=input_values,
+            toggled=jnp.int32(input_values != 0),
+            activation_counts=jnp.zeros(max_nodes, dtype=jnp.int32),
+            has_fired=jnp.zeros(max_nodes, dtype=jnp.int32),
+            node_depths=jnp.zeros(max_nodes, dtype=jnp.int32),
+            outdated_depths=True,
+        )
+
 
 @struct.dataclass
 class Network:
@@ -89,7 +111,7 @@ class Network:
     @property
     def n_enabled_nodes(
         self,
-    ) -> jnp.int32:  # TODO: check if this computation is jit-compatible
+    ) -> jnp.int32:
         return jnp.max(jnp.concatenate([self.senders, self.receivers]))
 
     @property
