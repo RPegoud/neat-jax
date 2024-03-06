@@ -26,7 +26,8 @@ Mutations:
   * [x] Weight reset
   * [x] Add node
   * [ ] Add connection
-    * [ ] Add a `depth` field to `ActivationState` to track node depths
+    * [x] Add a `depth` field to `ActivationState` to track node depths
+    * [ ] Test `get_depth` on multiple topologies
     * [ ] Update `depth_outdated` on mutations affecting network topology
 * [ ] Wrap all mutations in a single function
 
