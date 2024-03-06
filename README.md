@@ -1,16 +1,10 @@
 <!-- # ***🧬 Neat JAX*** -->
 # `neatJax`: Fast NeuroEvolution of Augmenting Topologies 🪸
 
-<center>
-    <img src="https://raw.githubusercontent.com/RPegoud/neat-jax/2d8fe31de24a1af26b90cab1722f6803c7d04567/images/Neat%20logo.svg?token=AOPYRH6UJEB6QXS5H26YVX3FZCJ26" width="170" align="right"/>
-</center>
-
-<a href= "https://github.com/psf/black">
-<img src="https://img.shields.io/badge/code%20style-black-000000.svg" /></a>
-<a href="https://github.com/RPegoud/jym/blob/main/LICENSE">
-<img src="https://img.shields.io/github/license/RPegoud/jym" /></a>
-<a href="https://github.com/astral-sh/ruff">
-<img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json"/></a>
+[![Issues](https://img.shields.io/github/issues/RPegoud/neat-jax)](https://github.com/RPegoud/neat-jax/issues)
+[![Issues](https://github.com/RPegoud/neat-jax/actions/workflows/lint_and_test.yaml/badge.svg)](https://github.com/RPegoud/neat-jax/actions/workflows/lint_and_test.yaml)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+<img src="https://raw.githubusercontent.com/RPegoud/neat-jax/2d8fe31de24a1af26b90cab1722f6803c7d04567/images/Neat%20logo.svg?token=AOPYRH6UJEB6QXS5H26YVX3FZCJ26" width="170" align="right"/>
 
 JAX implementation of the Neat ``(Evolving Neural Networks through Augmenting Topologies)`` algorithm.
 
@@ -32,6 +26,8 @@ Mutations:
   * [x] Weight reset
   * [x] Add node
   * [ ] Add connection
+    * [ ] Add a `depth` field to `ActivationState` to track node depths
+    * [ ] Update `depth_outdated` on mutations affecting network topology
 * [ ] Wrap all mutations in a single function
 
 Crossing:

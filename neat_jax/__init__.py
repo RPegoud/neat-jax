@@ -5,6 +5,7 @@ from .nn import (
     forward_toggled_nodes,
     get_activation,
     get_active_connections,
+    get_depth,
     get_required_activations,
     make_network,
     toggle_receivers,

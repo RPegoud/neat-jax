@@ -57,6 +57,8 @@ def make_network(
             toggled=activated_nodes,
             activation_counts=activation_counts,
             has_fired=has_fired,
+            node_depths=jnp.zeros(max_nodes, dtype=jnp.int32),
+            outdated_depths=True,
         ),
         Network(
             node_indices=jnp.arange(max_nodes, dtype=jnp.int32),
@@ -193,8 +195,8 @@ def forward_toggled_nodes(
             values = activation_state.values
             activation_counts = activation_state.activation_counts
 
-            # conditionally apply the current node's activation function if
-            # it belongs to the hidden layers (node_type == 1)
+            # if the current node is set to fire and is a hidden node (node_type==1),
+            # apply the activation function
             sender_value = values.at[sender].get()
             values = jax.lax.cond(
                 net.node_types.at[sender].get() == 1,
@@ -301,7 +303,7 @@ def forward(
     max_nodes: int,
     output_size: int,
     activate_final: bool = False,
-) -> ActivationState:
+) -> tuple[ActivationState, jnp.array]:
     """Executes a forward pass through the NEAT network.
 
     Repeatedly processes activations based on the current state, updating node activations
@@ -312,7 +314,8 @@ def forward(
         array sizes.
 
     Returns:
-        The final ActivationState after processing all activations.
+        * ActivationState: The final ActivationState after processing all activations.
+        * jnp.ndarray: The network's outputs
     """
 
     def _termination_condition(val: tuple) -> bool:
@@ -346,3 +349,100 @@ def forward(
     )
 
     return activation_state, outputs
+
+
+def forward_single_depth(senders, receivers, activation_state, net):
+    def _add_single_depth(activation_state: jnp.ndarray, x: tuple) -> jnp.ndarray:
+
+        def _update_depth(val: tuple) -> ActivationState:
+            activation_state, sender, receiver = val
+            values = activation_state.values
+            activation_counts = activation_state.activation_counts
+            node_depths = activation_state.node_depths
+
+            sender_depth = node_depths.at[sender].get()
+            receiver_depth = node_depths.at[receiver].get()
+            node_depths = node_depths.at[receiver].set(
+                jnp.max(jnp.array([sender_depth + 1, receiver_depth]))
+            )
+
+            activation_counts = activation_counts.at[receiver].add(1)
+            toggled = activation_state.toggled.at[sender].set(0)
+            has_fired = activation_state.has_fired.at[sender].set(1)
+            return (
+                activation_state.replace(
+                    values=values,
+                    activation_counts=activation_counts,
+                    toggled=toggled,
+                    has_fired=has_fired,
+                    node_depths=node_depths,
+                ),
+                None,
+            )
+
+        def _bypass(val: tuple):
+            """Bypasses the update for a given node."""
+            activation_state, *_ = val
+            return (activation_state, None)
+
+        sender, receiver = x
+
+        # nodes with negative indices are disabled and should not fire
+        return jax.lax.cond(
+            sender < 0,
+            _bypass,
+            _update_depth,
+            operand=(
+                activation_state,
+                jnp.int32(sender),
+                jnp.int32(receiver),
+            ),
+        )
+
+    activation_state, _ = jax.lax.scan(
+        _add_single_depth,
+        activation_state,
+        jnp.stack((senders, receivers), axis=1),
+    )
+    return activation_state
+
+
+@partial(jax.jit, static_argnames=("max_nodes"))
+def get_depth(
+    activation_state: ActivationState,
+    net: Network,
+    max_nodes: int,
+) -> tuple[ActivationState]:
+
+    def _initialize_depths(net: Network) -> jnp.ndarray:
+        """
+        Returns an array containing initial values of node depths.
+            - Input nodes: 0
+            - Hidden nodes: 1 (to be computed)
+            - Output nodes: ``max_nodes`` (maximal value)
+            - Deactivated nodes: -1
+        """
+        depth_types = jnp.array([0, 1, max_nodes, -1])
+        return jax.tree_map(lambda x: depth_types[x], net.node_types)
+
+    def _termination_condition(val: tuple) -> bool:
+        """Iterate while some nodes are still toggled."""
+        activation_state, _ = val
+        return jnp.sum(activation_state.toggled) > 0
+
+    def _body_fn(val: tuple):
+        activation_state, net = val
+        senders, receivers = get_active_connections(activation_state, net, max_nodes)
+        activation_state = forward_single_depth(
+            senders, receivers, activation_state, net
+        )
+        activation_state = toggle_receivers(activation_state, net, max_nodes)
+
+        return activation_state, net
+
+    activation_state.replace(node_depths=_initialize_depths(net))
+    activation_state, net = jax.lax.while_loop(
+        _termination_condition, _body_fn, (activation_state, net)
+    )
+
+    return activation_state.replace(outdated_depths=False)

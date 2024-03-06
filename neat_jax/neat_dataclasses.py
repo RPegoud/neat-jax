@@ -10,12 +10,21 @@ class ActivationState:
         toggled (jnp.ndarray): Boolean array indicating which neurons should
         fire at the next step
         activation_counts (jnp.ndarray): Number of times each node received an activation
+        node_depths (jnp.ndarray): Depth of each node in the network
+            - input_nodes: 0
+            - hidden_nodes: 0 by default (computed each time an edge is added)
+            - output_nodes: `max_nodes`
+            - disabled_nodes: -1
+        outdated_depths (bool, Optional): Boolean flag indicating whether `node_depths` is up to date
+        for the current network topology, usually set to `True` when a mutation adds an edge or a node
     """
 
     values: jnp.ndarray
     toggled: jnp.ndarray
     activation_counts: jnp.ndarray
     has_fired: jnp.ndarray
+    node_depths: jnp.ndarray
+    outdated_depths: bool = True
 
     def __repr__(self) -> str:
         for atr in ActivationState.__dataclass_fields__.keys():
