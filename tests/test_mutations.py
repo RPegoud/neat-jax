@@ -24,10 +24,10 @@ mutation_config_null = {
     "add_connection_rate": 0.0,
 }
 mutation_config_0_5 = {
-    "weight_shift_rate": 0.0,
-    "weight_mutation_rate": 0.0,
-    "add_node_rate": 0.0,
-    "add_connection_rate": 0.0,
+    "weight_shift_rate": 0.5,
+    "weight_mutation_rate": 0.5,
+    "add_node_rate": 0.5,
+    "add_connection_rate": 0.5,
 }
 mutation_config_certain = {
     "weight_shift_rate": 1.0,
@@ -64,6 +64,72 @@ class MutationTests(chex.TestCase, parameterized.TestCase):
                     ]
                 ),
                 "added_nodes_node_types": jnp.array([0, 0, 0, 2, 1, 3, 3, 3, 3, 3]),
+                "added_connection_weights": jnp.array(
+                    [1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+                ),
+                "added_connection_senders": jnp.concatenate(
+                    [
+                        jnp.array([0, 1, 2, 4]),
+                        jnp.repeat(jnp.array([-topology_config_0["max_nodes"]]), 6),
+                    ]
+                ),
+                "added_connection_receivers": jnp.concatenate(
+                    [
+                        jnp.array([4, 4, 3, 3]),
+                        jnp.repeat(jnp.array([-topology_config_0["max_nodes"]]), 6),
+                    ]
+                ),
+                "added_connection_node_types": jnp.array(
+                    [0, 0, 0, 2, 1, 3, 3, 3, 3, 3]
+                ),
+            },
+        ),
+        (
+            "topology_0__0.5_mutations",
+            topology_config_0,
+            mutation_config_0_5,
+            {"seed": 1},
+            {
+                "shifted_weights": jnp.array(
+                    [0.9356227, 1.0, 0.9701904, 1.0, 0, 0, 0, 0, 0, 0]
+                ),
+                "mutated_weights": jnp.array(
+                    [-0.06437729, 1.0, -0.02980961, 1.0, 0, 0, 0, 0, 0, 0]
+                ),
+                "added_node_weights": jnp.array(
+                    [1.0, 1.0, 0.0, 1.0, -0.00611208, -0.10968596, 0.0, 0.0, 0.0, 0.0]
+                ),
+                "added_nodes_senders": jnp.concatenate(
+                    [
+                        jnp.array([0, 1, -2, 4, 2, 5]),
+                        jnp.repeat(jnp.array([-topology_config_0["max_nodes"]]), 4),
+                    ]
+                ),
+                "added_nodes_receivers": jnp.concatenate(
+                    [
+                        jnp.array([4, 4, -3, 3, 5, 3]),
+                        jnp.repeat(jnp.array([-topology_config_0["max_nodes"]]), 4),
+                    ]
+                ),
+                "added_nodes_node_types": jnp.array([0, 0, 0, 2, 1, 1, 3, 3, 3, 3]),
+                "added_connection_weights": jnp.array(
+                    [1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+                ),
+                "added_connection_senders": jnp.concatenate(
+                    [
+                        jnp.array([0, 1, 2, 4]),
+                        jnp.repeat(jnp.array([-topology_config_0["max_nodes"]]), 6),
+                    ]
+                ),
+                "added_connection_receivers": jnp.concatenate(
+                    [
+                        jnp.array([4, 4, 3, 3]),
+                        jnp.repeat(jnp.array([-topology_config_0["max_nodes"]]), 6),
+                    ]
+                ),
+                "added_connection_node_types": jnp.array(
+                    [0, 0, 0, 2, 1, 3, 3, 3, 3, 3]
+                ),
             },
         ),
         (
@@ -94,36 +160,24 @@ class MutationTests(chex.TestCase, parameterized.TestCase):
                     ]
                 ),
                 "added_nodes_node_types": jnp.array([0, 0, 0, 2, 1, 1, 3, 3, 3, 3]),
-            },
-        ),
-        (
-            "topology_0__0.5_mutations",
-            topology_config_0,
-            mutation_config_certain,
-            {"seed": 1},
-            {
-                "shifted_weights": jnp.array(
-                    [0.9356227, 1.0769619, 0.9701904, 1.0478588, 0, 0, 0, 0, 0, 0]
+                "added_connection_weights": jnp.array(
+                    [1.0, 1.0, 1.0, 1.0, -0.02058423, 0.0, 0.0, 0.0, 0.0]
                 ),
-                "mutated_weights": jnp.array(
-                    [-0.06437729, 0.0769619, -0.02980961, 0.04785879, 0, 0, 0, 0, 0, 0]
-                ),
-                "added_node_weights": jnp.array(
-                    [1.0, 1.0, 0.0, 1.0, -0.00611208, -0.10968596, 0.0, 0.0, 0.0, 0.0]
-                ),
-                "added_nodes_senders": jnp.concatenate(
+                "added_connection_senders": jnp.concatenate(
                     [
-                        jnp.array([0, 1, -2, 4, 2, 5]),
-                        jnp.repeat(jnp.array([-topology_config_0["max_nodes"]]), 4),
+                        jnp.array([0, 1, 2, 4, 1]),
+                        jnp.repeat(jnp.array([-topology_config_0["max_nodes"]]), 5),
                     ]
                 ),
-                "added_nodes_receivers": jnp.concatenate(
+                "added_connection_receivers": jnp.concatenate(
                     [
-                        jnp.array([4, 4, -3, 3, 5, 3]),
-                        jnp.repeat(jnp.array([-topology_config_0["max_nodes"]]), 4),
+                        jnp.array([4, 4, 3, 3, 3]),
+                        jnp.repeat(jnp.array([-topology_config_0["max_nodes"]]), 5),
                     ]
                 ),
-                "added_nodes_node_types": jnp.array([0, 0, 0, 2, 1, 1, 3, 3, 3, 3]),
+                "added_connection_node_types": jnp.array(
+                    [0, 0, 0, 2, 1, 3, 3, 3, 3, 3]
+                ),
             },
         ),
     )
@@ -134,17 +188,22 @@ class MutationTests(chex.TestCase, parameterized.TestCase):
         mutations = Mutations(max_nodes=t_params["max_nodes"], **n_params)
         key = random.PRNGKey(rng_params["seed"])
 
-        shifted_weights = self.variant(mutations.weight_shift)(key, net).weights
-        mutated_weights = self.variant(mutations.weight_mutation)(key, net).weights
-        added_node_network = self.variant(
-            mutations.add_node, static_argnames=["max_nodes"]
-        )(key, net, t_params["max_nodes"])
+        shifted_weights = self.variant(mutations.weight_shift)(key, net, 0.1).weights
+        mutated_weights = self.variant(mutations.weight_mutation)(key, net, 0.1).weights
+        added_node_network = self.variant(mutations.add_node)(key, net, 0.1)
+        added_connection_network = self.variant(
+            mutations.add_connection, static_argnames=["self", "max_nodes"]
+        )(key, net, activation_state, t_params["max_nodes"])
 
+        # --- Shift weights tests ---
+        chex.assert_trees_all_close(shifted_weights, expected["shifted_weights"])
+
+        # --- Mutate weights tests ---
+        chex.assert_trees_all_close(mutated_weights, expected["mutated_weights"])
+
+        # --- Add node tests ---
         chex.assert_trees_all_close(
-            shifted_weights, expected["shifted_weights"], atol=1e-4
-        )
-        chex.assert_trees_all_close(
-            mutated_weights, expected["mutated_weights"], atol=1e-4
+            added_node_network.weights, expected["added_node_weights"]
         )
         chex.assert_trees_all_equal(
             added_node_network.senders, expected["added_nodes_senders"]
@@ -154,4 +213,15 @@ class MutationTests(chex.TestCase, parameterized.TestCase):
         )
         chex.assert_trees_all_equal(
             added_node_network.node_types, expected["added_nodes_node_types"]
+        )
+
+        # --- Add connection tests ---
+        chex.assert_trees_all_equal(
+            added_connection_network.senders, expected["added_connection_senders"]
+        )
+        chex.assert_trees_all_equal(
+            added_connection_network.receivers, expected["added_connection_receivers"]
+        )
+        chex.assert_trees_all_equal(
+            added_connection_network.node_types, expected["added_connection_node_types"]
         )

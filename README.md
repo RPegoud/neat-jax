@@ -27,8 +27,9 @@ Mutations:
   * [x] Add node
   * [ ] Add connection
     * [x] Add a `depth` field to `ActivationState` to track node depths
-    * [ ] Test `get_depth` on multiple topologies
-    * [ ] Update `depth_outdated` on mutations affecting network topology
+    * [x] Test `get_depth` on multiple topologies
+    * [x] Update `depth_outdated` on mutations affecting network topology
+    * [ ] Add tests
 * [ ] Wrap all mutations in a single function
 
 Crossing:

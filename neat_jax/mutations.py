@@ -17,9 +17,9 @@ class Mutations:
     add_node_rate: jnp.float32 = 0.03
     add_connection_rate: jnp.float32 = 0.05
 
-    @partial(jax.jit, static_argnums=(0))
+    @partial(jax.jit, static_argnames=("self", "scale_weights"))
     def weight_shift(
-        self, key: random.PRNGKey, net: Network, scale: float = 0.1
+        self, key: random.PRNGKey, net: Network, scale_weights: float = 0.1
     ) -> Network:
         """
         Shifts the network's weights by a small value sampled from the normal distribution.
@@ -60,7 +60,7 @@ class Mutations:
             )
 
         eps_key, mutate_key = random.split(key, num=2)
-        epsilons = random.normal(eps_key, shape=(self.max_nodes,)) * scale
+        epsilons = random.normal(eps_key, shape=(self.max_nodes,)) * scale_weights
         mutate_i = (
             random.uniform(mutate_key, shape=(self.max_nodes,)) < self.weight_shift_rate
         )
@@ -69,7 +69,7 @@ class Mutations:
 
     @partial(jax.jit, static_argnums=(0))
     def weight_mutation(
-        self, key: random.PRNGKey, net: Network, scale: float = 0.1
+        self, key: random.PRNGKey, net: Network, scale_weights: float = 0.1
     ) -> Network:
         """
         Randomly mutates connections from the network by sampling new weights from the normal distribution.
@@ -110,7 +110,7 @@ class Mutations:
             )
 
         sample_key, mutate_key = random.split(key, num=2)
-        new_values = random.normal(sample_key, shape=(self.max_nodes,)) * scale
+        new_values = random.normal(sample_key, shape=(self.max_nodes,)) * scale_weights
         mutate_i = (
             random.uniform(mutate_key, shape=(self.max_nodes,))
             < self.weight_mutation_rate
@@ -118,7 +118,7 @@ class Mutations:
         mutated_weights = jax.vmap(_single_mutation)(net.weights, new_values, mutate_i)
         return net.replace(weights=mutated_weights)
 
-    @partial(jax.jit, static_argnums=(0,))
+    @partial(jax.jit, static_argnames=("self", "scale_weights"))
     def add_node(
         self,
         key: random.PRNGKey,
@@ -146,7 +146,6 @@ class Mutations:
             Network: The mutated network with updated fields
         """
 
-        @partial(jax.jit, static_argnames=("max_nodes"))
         def _mutate_fn(
             net: Network, key: random.PRNGKey, scale_weights: float
         ) -> Network:
