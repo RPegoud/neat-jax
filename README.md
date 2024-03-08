@@ -25,11 +25,7 @@ Mutations:
   * [x] Weight shift
   * [x] Weight reset
   * [x] Add node
-  * [ ] Add connection
-    * [x] Add a `depth` field to `ActivationState` to track node depths
-    * [x] Test `get_depth` on multiple topologies
-    * [x] Update `depth_outdated` on mutations affecting network topology
-    * [ ] Add tests
+  * [x] Add connection
 * [ ] Wrap all mutations in a single function
 
 Crossing:

@@ -236,6 +236,20 @@ class Mutations:
         max_nodes: int,
         scale_weights: float = 0.1,
     ) -> tuple[Network, ActivationState]:
+        """
+        Samples a new connection between nodes, ensuring it adheres to network topology order
+        (i.e. the depth of the sender is lower than the depth of the receiver).
+
+        Args:
+            key (jax.random.PRNGKey): A PRNG key used for random operations.
+            net (Network): The current state of the network, containing node types and connections.
+            activation_state (ActivationState): The current activation state of the network, including node depths.
+            max_nodes (int): The maximum number of nodes in the network, used for defining array sizes.
+
+        Returns:
+            Network: The mutated network with a new connection
+            ActivationState: The activation state of the network with updated node depths
+        """
 
         def _mutate_fn(
             key: random.PRNGKey,
@@ -356,4 +370,4 @@ class Mutations:
             operand=None,
         )
 
-        return net
+        return net, activation_state

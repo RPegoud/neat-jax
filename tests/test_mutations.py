@@ -82,6 +82,9 @@ class MutationTests(chex.TestCase, parameterized.TestCase):
                 "added_connection_node_types": jnp.array(
                     [0, 0, 0, 2, 1, 3, 3, 3, 3, 3]
                 ),
+                "outdated_depths": jnp.bool_(
+                    True
+                ),  # no mutation => depths were not updated
             },
         ),
         (
@@ -130,6 +133,7 @@ class MutationTests(chex.TestCase, parameterized.TestCase):
                 "added_connection_node_types": jnp.array(
                     [0, 0, 0, 2, 1, 3, 3, 3, 3, 3]
                 ),
+                "outdated_depths": jnp.bool_(False),
             },
         ),
         (
@@ -178,6 +182,7 @@ class MutationTests(chex.TestCase, parameterized.TestCase):
                 "added_connection_node_types": jnp.array(
                     [0, 0, 0, 2, 1, 3, 3, 3, 3, 3]
                 ),
+                "outdated_depths": jnp.bool_(False),
             },
         ),
     )
@@ -191,7 +196,7 @@ class MutationTests(chex.TestCase, parameterized.TestCase):
         shifted_weights = self.variant(mutations.weight_shift)(key, net, 0.1).weights
         mutated_weights = self.variant(mutations.weight_mutation)(key, net, 0.1).weights
         added_node_network = self.variant(mutations.add_node)(key, net, 0.1)
-        added_connection_network = self.variant(
+        added_connection_network, added_connection_activation_state = self.variant(
             mutations.add_connection, static_argnames=["self", "max_nodes"]
         )(key, net, activation_state, t_params["max_nodes"])
 
@@ -224,4 +229,8 @@ class MutationTests(chex.TestCase, parameterized.TestCase):
         )
         chex.assert_trees_all_equal(
             added_connection_network.node_types, expected["added_connection_node_types"]
+        )
+        assert (
+            added_connection_activation_state.outdated_depths
+            == expected["outdated_depths"]
         )
