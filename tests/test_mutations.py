@@ -134,10 +134,11 @@ class MutationTests(chex.TestCase, parameterized.TestCase):
         mutations = Mutations(max_nodes=t_params["max_nodes"], **n_params)
         key = random.PRNGKey(rng_params["seed"])
 
-        shifted_weights = self.variant(mutations.weight_shift)(net, key).weights
-
-        mutated_weights = self.variant(mutations.weight_mutation)(net, key).weights
-        added_node_network = mutations.add_node(net, key)
+        shifted_weights = self.variant(mutations.weight_shift)(key, net).weights
+        mutated_weights = self.variant(mutations.weight_mutation)(key, net).weights
+        added_node_network = self.variant(
+            mutations.add_node, static_argnames=["max_nodes"]
+        )(key, net, t_params["max_nodes"])
 
         chex.assert_trees_all_close(
             shifted_weights, expected["shifted_weights"], atol=1e-4

@@ -2,7 +2,7 @@ import chex
 import jax.numpy as jnp
 from absl.testing import parameterized
 
-from neat_jax import forward, get_depth, get_required_activations, make_network
+from neat_jax import forward, get_required_activations, make_network, update_depth
 
 # TODO: test different activation functions within the network
 
@@ -111,7 +111,7 @@ class NetworkTests(chex.TestCase, parameterized.TestCase):
 
         # --- test depth computation ---
         chex.assert_equal(activation_state.outdated_depths, jnp.bool_(True))
-        activation_state = self.variant(get_depth, static_argnames=("max_nodes"))(
+        activation_state = self.variant(update_depth, static_argnames=("max_nodes"))(
             activation_state, net, params["max_nodes"]
         )
         chex.assert_trees_all_equal(

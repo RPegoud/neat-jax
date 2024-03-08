@@ -4,7 +4,7 @@ import chex
 import jax
 import jax.numpy as jnp
 
-from neat_jax import ActivationState, Network
+from .neat_dataclasses import ActivationState, Network
 
 
 def make_network(
@@ -335,7 +335,7 @@ def forward(
 
     # reset the activation state from previous forward passes
     input_values = jnp.int32(net.node_types == 0) * activation_state.values
-    activation_state = ActivationState.reset(input_values, max_nodes)
+    activation_state = ActivationState.from_inputs(input_values, max_nodes)
 
     activation_state, net = jax.lax.while_loop(
         _termination_condition, _body_fn, (activation_state, net)
@@ -425,18 +425,13 @@ def forward_single_depth(senders, receivers, activation_state):
 
 
 @partial(jax.jit, static_argnames=("max_nodes"))
-def get_depth(
+def update_depth(
     activation_state: ActivationState,
     net: Network,
     max_nodes: int,
 ) -> tuple[ActivationState]:
     """
     Computes the depth of each node in the network by performing a forward pass simulation.
-
-    Starts with input nodes having their depths set based on initial activation values,
-    then iteratively updates the depths of connected nodes. This process repeats until
-    no more updates occur, ensuring that the depth of each node reflects the longest path
-    from any input node.
 
     Args:
         activation_state (ActivationState): The initial state of the network activations.
@@ -461,7 +456,7 @@ def get_depth(
         return activation_state, net
 
     input_values = jnp.int32(net.node_types == 0) * activation_state.values
-    activation_state = ActivationState.reset(input_values, max_nodes)
+    activation_state = ActivationState.from_inputs(input_values, max_nodes)
 
     activation_state, net = jax.lax.while_loop(
         _termination_condition, _body_fn, (activation_state, net)

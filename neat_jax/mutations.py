@@ -6,6 +6,7 @@ from flax import struct
 from jax import random
 
 from .neat_dataclasses import ActivationState, Network
+from .nn import update_depth
 
 
 @struct.dataclass
@@ -18,7 +19,7 @@ class Mutations:
 
     @partial(jax.jit, static_argnums=(0))
     def weight_shift(
-        self, net: Network, key: random.PRNGKey, scale: float = 0.1
+        self, key: random.PRNGKey, net: Network, scale: float = 0.1
     ) -> Network:
         """
         Shifts the network's weights by a small value sampled from the normal distribution.
@@ -68,7 +69,7 @@ class Mutations:
 
     @partial(jax.jit, static_argnums=(0))
     def weight_mutation(
-        self, net: Network, key: random.PRNGKey, scale: float = 0.1
+        self, key: random.PRNGKey, net: Network, scale: float = 0.1
     ) -> Network:
         """
         Randomly mutates connections from the network by sampling new weights from the normal distribution.
@@ -117,8 +118,12 @@ class Mutations:
         mutated_weights = jax.vmap(_single_mutation)(net.weights, new_values, mutate_i)
         return net.replace(weights=mutated_weights)
 
+    @partial(jax.jit, static_argnums=(0,))
     def add_node(
-        self, net: Network, key: random.PRNGKey, scale_weights: float = 0.1
+        self,
+        key: random.PRNGKey,
+        net: Network,
+        scale_weights: float = 0.1,
     ) -> Network:
         """
         Inserts a new node in the network by splitting an existing connection.
@@ -143,8 +148,8 @@ class Mutations:
 
         @partial(jax.jit, static_argnames=("max_nodes"))
         def _mutate_fn(
-            net: Network, key: random.PRNGKey, max_nodes: int, scale_weights: float
-        ):
+            net: Network, key: random.PRNGKey, scale_weights: float
+        ) -> Network:
             node_key, weight_key, activation_key = random.split(key, num=3)
             new_node_index = net.n_enabled_nodes + 1
 
@@ -152,9 +157,10 @@ class Mutations:
             valid_senders = jnp.int32(net.node_types < 2)  # input and hidden nodes
             selected = random.choice(
                 node_key,
-                jnp.arange(max_nodes) * valid_senders,
+                jnp.arange(self.max_nodes) * valid_senders,
                 p=valid_senders / valid_senders.sum(),
             )
+
             selected_sender = net.senders[selected]
             selected_receiver = net.receivers[selected]
 
@@ -166,8 +172,8 @@ class Mutations:
             connection_pos = jnp.int32(
                 jnp.min(
                     jnp.where(
-                        net.senders == -max_nodes,
-                        size=max_nodes,
+                        net.senders == -self.max_nodes,
+                        size=self.max_nodes,
                         fill_value=jnp.inf,
                     )[0]
                 )
@@ -205,25 +211,150 @@ class Mutations:
                 activation_indices=activation_indices,
             )
 
-        def _bypass_fn(net: Network, key, max_nodes, scale_weights) -> Network:
+        def _bypass_fn(net: Network, *args) -> Network:
             """Bypasses the mutation function depending on the `mutate` flag."""
             return net
 
-        # this assertion is not jittable
-        assert (
+        can_add_node = (
             sum(net.node_types == 3) >= 2
-        ), "Not enough space to add new nodes to the network"
-
+        )  # we need at least two uninitialized node
         mutate = random.uniform(key) < self.add_node_rate
-        return jax.lax.cond(
-            mutate,
-            lambda _: _mutate_fn(net, key, self.max_nodes, scale_weights),
-            lambda _: _bypass_fn(net, key, self.max_nodes, scale_weights),
+        net = jax.lax.cond(
+            jnp.logical_and(mutate, can_add_node),
+            lambda _: _mutate_fn(net, key, scale_weights),
+            lambda _: _bypass_fn(net, key, scale_weights),
             operand=None,
         )
 
+        return net
+
+    @partial(jax.jit, static_argnames=("self", "max_nodes"))
     def add_connection(
+        self,
+        key: random.PRNGKey,
         net: Network,
         activation_state: ActivationState,
-    ):
-        raise NotImplementedError
+        max_nodes: int,
+        scale_weights: float = 0.1,
+    ) -> tuple[Network, ActivationState]:
+
+        def _mutate_fn(
+            key: random.PRNGKey,
+            net: Network,
+            activation_state: ActivationState,
+            max_nodes: int,
+        ) -> tuple[jnp.int32, jnp.int32, ActivationState]:
+            """
+            Samples a new connection to be added to the network, ensuring it complies with
+            topological order.
+            """
+            node_key, receiver_key = random.split(key, num=2)
+
+            # connections can only be added to input and hidden nodes
+            valid_senders = jnp.int32(net.node_types < 2)
+            selected_sender = random.choice(
+                node_key,
+                jnp.arange(max_nodes),
+                p=valid_senders / valid_senders.sum(),  # uniform sampling
+            )
+
+            # conditionally compute node depths if current values are outdated
+            activation_state = jax.lax.cond(
+                activation_state.outdated_depths,
+                lambda _: update_depth(activation_state, net, max_nodes),
+                lambda _: activation_state,
+                operand=(None),
+            )
+            node_depths = activation_state.node_depths
+            selected_depth = node_depths.at[selected_sender].get()
+
+            # receivers that are already linked with the selected sender
+            existing_receivers = net.receivers * jnp.int32(
+                net.senders == selected_sender
+            )
+            compatible_receivers = jnp.int32(node_depths > selected_depth) * jnp.arange(
+                max_nodes
+            )
+
+            # receiver indices with higher depths than selected sender and no prior connection
+            receiver_candidates = jnp.setdiff1d(
+                compatible_receivers, existing_receivers, size=max_nodes
+            )
+            receiver_candidates_mask = jnp.sign(receiver_candidates)
+
+            selected_receiver = random.choice(
+                receiver_key,
+                receiver_candidates,
+                p=(
+                    receiver_candidates_mask / receiver_candidates_mask.sum()
+                ),  # uniform sampling
+            )
+
+            return selected_sender, selected_receiver, activation_state
+
+        def _bypass_mutate_fn(*args):
+            return (
+                jnp.int32(0),
+                jnp.int32(0),
+                activation_state,
+            )
+
+        def _apply_mutation_fn(
+            key: random.PRNGKey,
+            selected_sender: jnp.ndarray,
+            selected_receiver: jnp.ndarray,
+            net: Network,
+            scale_weights: float = 0.1,
+        ) -> Network:
+            """
+            Adds the sampled connection to the network topology.
+
+            This function is bypassed if the sampled receiver is equal to 0 (i.e., if no valid
+            index could be sampled).
+            """
+            # determine where to append the new connection
+            connection_pos = jnp.int32(
+                jnp.min(
+                    jnp.where(
+                        net.senders == -self.max_nodes,
+                        size=self.max_nodes,
+                        fill_value=jnp.inf,
+                    )[0]
+                )
+            )
+
+            # add new connection
+            senders = net.senders.at[connection_pos].set(selected_sender)
+            receivers = net.receivers.at[connection_pos].set(selected_receiver)
+
+            # initialize new weights, disable old sender -> receiver connection
+            new_weight = random.normal(key) * scale_weights
+            weights = net.weights.at[jnp.array([connection_pos])].set(new_weight)
+
+            return net.replace(
+                senders=senders,
+                receivers=receivers,
+                weights=weights,
+            )
+
+        def _bypass_apply_mutation(*args):
+            return net
+
+        mutate = random.uniform(key) < self.add_connection_rate
+        selected_sender, selected_receiver, activation_state = jax.lax.cond(
+            mutate,
+            lambda _: _mutate_fn(key, net, activation_state, max_nodes),
+            lambda _: _bypass_mutate_fn(),
+            operand=None,
+        )
+
+        net = jax.lax.cond(
+            selected_receiver > 0,  # if no receiver was sampled
+            lambda _: _apply_mutation_fn(
+                key, selected_sender, selected_receiver, net, scale_weights
+            ),
+            lambda _: _bypass_apply_mutation(),
+            operand=None,
+        )
+
+        return net

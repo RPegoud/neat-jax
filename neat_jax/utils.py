@@ -1,6 +1,19 @@
+import jax.numpy as jnp
+import jax.random as random
 import networkx as nx
 
-from neat_jax import Network
+from .neat_dataclasses import Network
+
+
+def sample_from_mask(
+    key: random.PRNGKey,
+    mask: jnp.ndarray,
+    indices: jnp.ndarray,
+):
+    """
+    Samples an index uniformly given a masked array.
+    """
+    return random.choice(key, indices * mask, p=mask / mask.sum())
 
 
 def plot_network(net) -> None:

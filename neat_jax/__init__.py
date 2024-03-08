@@ -5,9 +5,9 @@ from .nn import (
     forward_toggled_nodes,
     get_activation,
     get_active_connections,
-    get_depth,
     get_required_activations,
     make_network,
     toggle_receivers,
+    update_depth,
 )
-from .utils import plot_network
+from .utils import plot_network, sample_from_mask

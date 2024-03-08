@@ -1,3 +1,6 @@
+from functools import partial
+
+import jax
 import jax.numpy as jnp
 from flax import struct
 
@@ -10,11 +13,8 @@ class ActivationState:
         toggled (jnp.ndarray): Boolean array indicating which neurons should
         fire at the next step
         activation_counts (jnp.ndarray): Number of times each node received an activation
-        node_depths (jnp.ndarray): Depth of each node in the network
-            - input_nodes: 0
-            - hidden_nodes: 0 by default (computed each time an edge is added)
-            - output_nodes: `max_nodes`
-            - disabled_nodes: -1
+        node_depths (jnp.ndarray): Depth of each node in the network, used to add new connections in
+        topological order (and avoid recurrent connections)
         outdated_depths (bool, Optional): Boolean flag indicating whether `node_depths` is up to date
         for the current network topology, usually set to `True` when a mutation adds an edge or a node
     """
@@ -32,18 +32,24 @@ class ActivationState:
         return ""
 
     @staticmethod
-    def reset(input_values: jnp.ndarray, max_nodes: int) -> "ActivationState":
+    @partial(jax.jit, static_argnames=("max_nodes"))
+    def from_inputs(input_values: jnp.ndarray, max_nodes: int) -> "ActivationState":
         """
-        Resets the ActivationState for a forward pass or a depth scan.
+        Resets the ActivationState in prevision of a forward pass or a depth scan.
 
         Args:
             input_values (jnp.ndarray): The activation values of the network's input nodes
             max_nodes (int): The maximum capacity of the network
 
         Returns:
-            ActivationState: The reset ActivationState
+            ActivationState: The reset ActivationState with:
+
+                - ``values``: initialized based on inputs
+                - ``toggled``: input neurons toggled
+                - ``activation_counts``: set to zero
+                - ``has_fired``: set to zero
+                - ``outdated_depths``: True
         """
-        assert len(input_values) == max_nodes
         return ActivationState(
             values=input_values,
             toggled=jnp.int32(input_values != 0),
