@@ -1,15 +1,36 @@
+import chex
 import jax.numpy as jnp
 import jax.random as random
 import networkx as nx
+from jax.typing import DTypeLike
 
-from .neat_dataclasses import Network
+from ..neat_dataclasses import Network
+
+
+def cartesian_product(
+    arr1: chex.Array,
+    arr2: chex.Array,
+    size: int = None,
+    fill_value: int = None,
+    dtype: DTypeLike = jnp.int32,
+):
+    cartesian_prod = jnp.dstack(jnp.meshgrid(arr1, arr2)).reshape(-1, 2)
+
+    if size is None:
+        return cartesian_prod
+
+    chex.assert_axis_dimension_lt(cartesian_prod, 0, size)
+    resized_cartesian_prod = jnp.full(
+        shape=(size, 2), fill_value=fill_value, dtype=dtype
+    )
+    return resized_cartesian_prod.at[: len(cartesian_prod)].set(cartesian_prod)
 
 
 def sample_from_mask(
     key: random.PRNGKey,
     mask: jnp.ndarray,
     indices: jnp.ndarray,
-):
+) -> jnp.ndarray:
     """
     Samples an index uniformly given a masked array.
     """

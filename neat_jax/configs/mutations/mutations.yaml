@@ -1,0 +1,5 @@
+weight_shift_rate: 0.5
+weight_mutation_rate: 0.1
+add_node_rate: 0.03
+add_connection_rate: 0.05
+activation_fn_mutation_rate: 0.1
