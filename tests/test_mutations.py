@@ -12,7 +12,7 @@ topology_config_0 = {
     "senders": jnp.array([0, 1, 2, 4]),
     "receivers": jnp.array([4, 4, 3, 3]),
     "weights": jnp.array([1, 1, 1, 1]),
-    "activation_indices": jnp.array([0, 0, 0, 0, 0]),
+    "activation_fns": jnp.array([0, 0, 0, 0, 0]),
     "node_types": jnp.array([0, 0, 0, 2, 1]),
     "inputs": jnp.array([0.5, 0.8, 0.2]),
     "output_size": 1,
@@ -193,20 +193,23 @@ class MutationTests(chex.TestCase, parameterized.TestCase):
         mutations = Mutations(max_nodes=t_params["max_nodes"], **n_params)
         key = random.PRNGKey(rng_params["seed"])
 
+        # --- Independent mutations ---
         shifted_weights = self.variant(mutations.weight_shift)(key, net, 0.1).weights
         mutated_weights = self.variant(mutations.weight_mutation)(key, net, 0.1).weights
-        added_node_network = self.variant(mutations.add_node)(key, net, 0.1)
+        added_node_network, added_node_activation_state = self.variant(
+            mutations.add_node
+        )(key, net, 0.1)
         added_connection_network, added_connection_activation_state = self.variant(
-            mutations.add_connection, static_argnames=["self", "max_nodes"]
-        )(key, net, activation_state, t_params["max_nodes"])
+            mutations.add_connection, static_argnames=["self"]
+        )(key, net, activation_state)
 
-        # --- Shift weights tests ---
+        # Shift weights tests
         chex.assert_trees_all_close(shifted_weights, expected["shifted_weights"])
 
-        # --- Mutate weights tests ---
+        # Mutate weights tests
         chex.assert_trees_all_close(mutated_weights, expected["mutated_weights"])
 
-        # --- Add node tests ---
+        # Add node tests
         chex.assert_trees_all_close(
             added_node_network.weights, expected["added_node_weights"]
         )
@@ -220,7 +223,7 @@ class MutationTests(chex.TestCase, parameterized.TestCase):
             added_node_network.node_types, expected["added_nodes_node_types"]
         )
 
-        # --- Add connection tests ---
+        # Add connection tests
         chex.assert_trees_all_equal(
             added_connection_network.senders, expected["added_connection_senders"]
         )
@@ -234,3 +237,5 @@ class MutationTests(chex.TestCase, parameterized.TestCase):
             added_connection_activation_state.outdated_depths
             == expected["outdated_depths"]
         )
+
+        # --- Sequential mutations ---

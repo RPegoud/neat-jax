@@ -4,72 +4,8 @@ import chex
 import jax
 import jax.numpy as jnp
 
+from .initialization import activation_state_from_inputs
 from .neat_dataclasses import ActivationState, Network
-
-
-def make_network(
-    senders: jnp.ndarray,
-    receivers: jnp.ndarray,
-    weights: jnp.ndarray,
-    activation_indices: jnp.ndarray,
-    inputs: jnp.ndarray,
-    node_types: jnp.ndarray,
-    max_nodes: int,
-    output_size: int,
-) -> tuple[ActivationState, Network]:
-    """
-    Initializes the network and activation state for NEAT processing.
-    """
-
-    chex.assert_trees_all_equal_shapes(senders, receivers, weights)
-    chex.assert_trees_all_equal_shapes(activation_indices, node_types)
-
-    senders = (
-        (jnp.ones(max_nodes, dtype=jnp.int32) * -max_nodes)
-        .at[: len(senders)]
-        .set(senders)
-    )
-    receivers = (
-        (jnp.ones(max_nodes, dtype=jnp.int32) * -max_nodes)
-        .at[: len(receivers)]
-        .set(receivers)
-    )
-    weights = (jnp.zeros(max_nodes, dtype=jnp.float32)).at[: len(weights)].set(weights)
-    activation_indices = (
-        (jnp.zeros(max_nodes, dtype=jnp.int32))
-        .at[: len(activation_indices)]
-        .set(activation_indices)
-    )
-
-    node_types = (
-        (jnp.ones(max_nodes, dtype=jnp.int32) * 3)  # disabled nodes have index 3
-        .at[: len(node_types)]
-        .set(node_types)
-    )
-    activations = jnp.zeros(max_nodes).at[: len(inputs)].set(inputs)
-    activated_nodes = jnp.int32(activations > 0)
-    activation_counts = jnp.zeros(max_nodes, dtype=jnp.int32)
-    has_fired = jnp.zeros(max_nodes, dtype=jnp.int32)
-
-    return (
-        ActivationState(
-            values=activations,
-            toggled=activated_nodes,
-            activation_counts=activation_counts,
-            has_fired=has_fired,
-            node_depths=jnp.zeros(max_nodes, dtype=jnp.int32),
-            outdated_depths=True,
-        ),
-        Network(
-            node_indices=jnp.arange(max_nodes, dtype=jnp.int32),
-            node_types=node_types,
-            weights=weights,
-            activation_indices=activation_indices,
-            senders=senders,
-            receivers=receivers,
-            output_size=output_size,
-        ),
-    )
 
 
 def get_required_activations(net: Network, size: int) -> jnp.ndarray:
@@ -95,7 +31,9 @@ def get_required_activations(net: Network, size: int) -> jnp.ndarray:
         )
 
     required_activations, _ = jax.lax.scan(
-        _carry, (jnp.zeros(size, dtype=jnp.int32)), net.receivers
+        _carry,
+        (jnp.zeros(size, dtype=jnp.int32)),
+        net.receivers,  # TODO: replace init by jnp.zeros_like(net.senders,dtype=jnp.int32) and remove size arg
     )
     return required_activations
 
@@ -133,24 +71,26 @@ def get_active_connections(
     return active_senders, active_receivers
 
 
-def get_activation(activation_index: int, x: float) -> jnp.float32:
+def get_activation_fn(activation_index: int, x: float) -> jnp.float32:
     """
     Given an index, selects an activation function and computes `activation(x)`.
 
     ```python
-        0: 1 / (1 + jnp.exp(-x)),  # sigmoid
-        1: jnp.divide(1, x),  # inverse
-        2: jnp.sinh(x) / jnp.cosh(x),  # hyperbolic cosine
-        3: jnp.float32(jnp.maximum(0, x)),  # relu
-        4: jnp.float32(jnp.abs(x)),  # absolute value
-        5: jnp.sin(x),  # sine
-        6: jnp.exp(jnp.square(-x)),  # gaussian
-        7: jnp.float32(jnp.sign(x)),  # step
+        0: jnp.float32(x) # identity function
+        1: 1 / (1 + jnp.exp(-x)),  # sigmoid
+        2: jnp.divide(1, x),  # inverse
+        3: jnp.sinh(x) / jnp.cosh(x),  # hyperbolic cosine
+        4: jnp.float32(jnp.maximum(0, x)),  # relu
+        5: jnp.float32(jnp.abs(x)),  # absolute value
+        6: jnp.sin(x),  # sine
+        7: jnp.exp(jnp.square(-x)),  # gaussian
+        8: jnp.float32(jnp.sign(x)),  # step
         ```
     """
     return jax.lax.switch(
         activation_index,
         [
+            lambda x: jnp.float32(x),  # identity
             lambda x: 1 / (1 + jnp.exp(-x)),  # sigmoid
             lambda x: jnp.divide(1, x),  # inverse
             lambda x: jnp.sinh(x) / jnp.cosh(x),  # hyperbolic cosine
@@ -201,13 +141,16 @@ def forward_toggled_nodes(
             values = jax.lax.cond(
                 net.node_types.at[sender].get() == 1,
                 lambda _: values.at[sender].set(
-                    get_activation(activation_index, x=sender_value)
+                    get_activation_fn(activation_index, x=sender_value)
                 ),
                 lambda _: values,
                 operand=None,
             )
 
+            # propagate the sender's value to the receiver
             values = values.at[receiver].add(values[sender] * weight)
+
+            # update activation_state
             activation_counts = activation_counts.at[receiver].add(1)
             toggled = activation_state.toggled.at[sender].set(0)
             has_fired = activation_state.has_fired.at[sender].set(1)
@@ -245,7 +188,7 @@ def forward_toggled_nodes(
     activation_state, _ = jax.lax.scan(
         _add_single_activation,
         activation_state,
-        jnp.stack((senders, receivers, net.weights, net.activation_indices), axis=1),
+        jnp.stack((senders, receivers, net.weights, net.activation_fns), axis=1),
     )
     return activation_state
 
@@ -267,10 +210,10 @@ def toggle_receivers(
     def _update_toggle(val: tuple) -> jnp.ndarray:
         """
         Returns a mask designating nodes to activate at the next step.
-        A node will be activated at next step if:
+
+        A node will be activated at the next step if:
             * It has not fired previously
             * (and) It has received values from all its senders
-        try keeping only has not fired
         """
         activation_state, required_activations = val
         has_req_activations = activation_state.activation_counts == required_activations
@@ -278,7 +221,7 @@ def toggle_receivers(
         return has_req_activations & has_not_fired
 
     def _terminate(val: tuple) -> jnp.ndarray:
-        """Disables all nodes, ending of the forward pass."""
+        """Disables all nodes, ending the forward pass."""
         return jnp.zeros(max_nodes, dtype=jnp.int32)
 
     required_activations = get_required_activations(net, max_nodes)
@@ -296,11 +239,12 @@ def toggle_receivers(
     )
 
 
-@partial(jax.jit, static_argnames=("max_nodes", "output_size"))
+@partial(jax.jit, static_argnames=("max_nodes", "input_size", "output_size"))
 def forward(
-    activation_state: ActivationState,
+    inputs: chex.Array,
     net: Network,
-    max_nodes: int,
+    max_nodes: int,  # TODO: find a way to remove max_nodes and output_size as arguments, maybe through config
+    input_size: int,
     output_size: int,
     activate_final: bool = False,
 ) -> tuple[ActivationState, jnp.array]:
@@ -333,21 +277,21 @@ def forward(
 
         return activation_state, net
 
-    # reset the activation state from previous forward passes
-    input_values = jnp.int32(net.node_types == 0) * activation_state.values
-    activation_state = ActivationState.from_inputs(input_values, max_nodes)
+    activation_state = activation_state_from_inputs(
+        inputs, net.senders, net.node_types, input_size, max_nodes
+    )
 
     activation_state, net = jax.lax.while_loop(
         _termination_condition, _body_fn, (activation_state, net)
     )
 
     output_nodes_indices = jnp.where(net.node_types == 2, size=output_size)[0]
-    activation_functions_indices = net.activation_indices.at[output_nodes_indices].get()
+    activation_functions_indices = net.activation_fns.at[output_nodes_indices].get()
     outputs = activation_state.values.at[output_nodes_indices].get()
 
     outputs = jax.lax.cond(
         activate_final,
-        lambda _: jax.vmap(get_activation)(activation_functions_indices, outputs),
+        lambda _: jax.vmap(get_activation_fn)(activation_functions_indices, outputs),
         lambda _: outputs,
         operand=None,
     )
