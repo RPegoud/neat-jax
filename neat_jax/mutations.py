@@ -5,8 +5,10 @@ import jax
 import jax.numpy as jnp
 from flax import struct
 
+from .activation_fns import activation_fns_list
 from .neat_dataclasses import ActivationState, Network
 from .nn import update_depth
+from .utils.utils import sample_from_mask
 
 
 @struct.dataclass
@@ -367,8 +369,54 @@ class Mutations:
 
         return net, activation_state
 
-    def activation_fn_mutation(key: chex.PRNGKey):
-        raise NotImplementedError
+    def activation_fn_mutation(self, key: chex.PRNGKey, net: Network) -> Network:
+        """
+        Mutates the activation function of a randomly selected node in the network.
+
+        This function selects a random node from the hidden and output nodes and assigns it a new activation
+        function that is different from its current one.
+
+        Args:
+            key (chex.PRNGKey): A PRNG key used for random operations.
+            net (Network): The current state of the network.
+
+        Returns:
+            Network: The mutated network with an updated activation function for a selected node, if the mutation occurs.
+        """
+
+        def _mutate_fn(val: tuple) -> Network:
+            key, net = val
+            mutation_selector, mutation_rng = jax.random.split(key)
+
+            # sample a node to mutate from hidden and output nodes (type 1 & 2)
+            node_selection_mask = jnp.int32(jnp.isin(net.node_types, jnp.array([1, 2])))
+            node_to_mutate = sample_from_mask(
+                mutation_selector, node_selection_mask, net.node_indices
+            )
+
+            # sample an activation function index for the mutation
+            valid_activation_fns = jnp.arange(len(activation_fns_list))
+            current_activation_fn = net.activation_fns[node_to_mutate]
+            possible_fn_mask = jnp.int32(valid_activation_fns != current_activation_fn)
+            new_activation_fn = sample_from_mask(
+                mutation_rng, possible_fn_mask, valid_activation_fns
+            )
+
+            # update the network
+            updated_activation_fns = net.activation_fns.at[node_to_mutate].set(
+                new_activation_fn
+            )
+
+            return net.replace(activation_fns=updated_activation_fns)
+
+        def _bypass(val: tuple) -> Network:
+            _, net = val
+            return net
+
+        mutate = jax.random.uniform(key) < self.activation_fn_mutation_rate
+        net = jax.lax.cond(mutate, _mutate_fn, _bypass, operand=(key, net))
+
+        return net
 
     def mutate(
         self,
@@ -377,6 +425,24 @@ class Mutations:
         activation_state: ActivationState,
         scale_weights: float = 0.1,
     ) -> tuple[Network, ActivationState]:
+        """
+        Applies a series of mutations to the network, including weight mutations, node addition,
+        connection addition, and activation function mutation.
+
+        This function sequentially applies different types of mutations to the network, each controlled by
+        a separate random key. It updates the network weights, adds new nodes and connections, and mutates
+        the activation functions of selected nodes.
+
+        Args:
+            key (jax.random.PRNGKey): A PRNG key used for random operations.
+            net (Network): The current state of the network.
+            activation_state (ActivationState): The current activation state of the network.
+            scale_weights (float, optional): A scaling factor for weight mutations and shifts. Defaults to 0.1.
+
+        Returns:
+            tuple[Network, ActivationState]: The mutated network and updated activation state.
+        """
+
         w_mutation_key, w_shift_key, node_key, connection_key, activation_key = (
             jax.random.split(key, num=5)
         )
@@ -387,6 +453,6 @@ class Mutations:
         net, activation_state = self.add_connection(
             connection_key, net, activation_state, scale_weights
         )
-        net = self.activation_fn_mutation(activation_key)
+        net = self.activation_fn_mutation(activation_key, net)
 
         return net, activation_state

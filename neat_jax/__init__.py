@@ -1,3 +1,4 @@
+from .activation_fns import activation_fns_list, get_activation_fn
 from .initialization import activation_state_from_inputs, init_network
 from .mutations import Mutations
 from .neat_dataclasses import ActivationState, Network
