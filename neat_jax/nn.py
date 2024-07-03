@@ -3,6 +3,7 @@ from functools import partial
 import chex
 import jax
 import jax.numpy as jnp
+from omegaconf import DictConfig
 
 from .initialization import activation_state_from_inputs
 from .neat_dataclasses import ActivationState, Network
@@ -239,13 +240,11 @@ def toggle_receivers(
     )
 
 
-@partial(jax.jit, static_argnames=("max_nodes", "input_size", "output_size"))
+@partial(jax.jit, static_argnames=("config"))
 def forward(
     inputs: chex.Array,
     net: Network,
-    max_nodes: int,  # TODO: find a way to remove max_nodes and output_size as arguments, maybe through config
-    input_size: int,
-    output_size: int,
+    config: DictConfig,
     activate_final: bool = False,
 ) -> tuple[ActivationState, jnp.array]:
     """Executes a forward pass through the NEAT network.
@@ -269,23 +268,27 @@ def forward(
 
     def _body_fn(val: tuple):
         activation_state, net = val
-        senders, receivers = get_active_connections(activation_state, net, max_nodes)
+        senders, receivers = get_active_connections(
+            activation_state, net, config.network.max_nodes
+        )
         activation_state = forward_toggled_nodes(
             senders, receivers, activation_state, net
         )
-        activation_state = toggle_receivers(activation_state, net, max_nodes)
+        activation_state = toggle_receivers(
+            activation_state, net, config.network.max_nodes
+        )
 
         return activation_state, net
 
     activation_state = activation_state_from_inputs(
-        inputs, net.senders, net.node_types, input_size, max_nodes
+        inputs, net.senders, net.node_types, config.input_size, config.network.max_nodes
     )
 
     activation_state, net = jax.lax.while_loop(
         _termination_condition, _body_fn, (activation_state, net)
     )
 
-    output_nodes_indices = jnp.where(net.node_types == 2, size=output_size)[0]
+    output_nodes_indices = jnp.where(net.node_types == 2, size=config.output_size)[0]
     activation_functions_indices = net.activation_fns.at[output_nodes_indices].get()
     outputs = activation_state.values.at[output_nodes_indices].get()
 

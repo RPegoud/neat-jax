@@ -20,13 +20,7 @@ def run_exp(config: dict):
     )
     mutations = Mutations(max_nodes=config.network.max_nodes, **config.mutations)
     net = mutations.add_node(key, net)
-    activation_state, y = forward(
-        inputs,
-        net,
-        config.network.max_nodes,
-        config.input_size,
-        config.output_size,
-    )
+    activation_state, y = forward(inputs, net, config)
 
     print(activation_state, y)
 
@@ -38,7 +32,7 @@ def run_exp(config: dict):
 )
 def hydra_entry_point(cfg: DictConfig):
     OmegaConf.set_struct(cfg, False)
-    log_config(OmegaConf.to_object(cfg))
+    log_config(cfg)
     return run_exp(cfg)
 
 
