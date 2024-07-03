@@ -12,10 +12,11 @@ from .nn import update_depth
 @struct.dataclass
 class Mutations:
     max_nodes: int
-    weight_shift_rate: jnp.float32 = 0.9
-    weight_mutation_rate: jnp.float32 = 0.1
-    add_node_rate: jnp.float32 = 0.03
-    add_connection_rate: jnp.float32 = 0.05
+    weight_shift_rate: jnp.float32
+    weight_mutation_rate: jnp.float32
+    add_node_rate: jnp.float32
+    add_connection_rate: jnp.float32
+    activation_fn_mutation_rate: jnp.float32
 
     @partial(jax.jit, static_argnames=("self", "scale_weights"))
     def weight_shift(
@@ -211,7 +212,7 @@ class Mutations:
             return net
 
         can_add_node = (
-            sum(net.senders == -net.max_nodes) >= 2  # TODO: use common max_nodes
+            sum(net.senders == -self.max_nodes) >= 2
         )  # we need at least two uninitialized node
         mutate = jax.random.uniform(key) < self.add_node_rate
         net = jax.lax.cond(
@@ -366,7 +367,7 @@ class Mutations:
 
         return net, activation_state
 
-    def activation_fn_mutation():
+    def activation_fn_mutation(key: chex.PRNGKey):
         raise NotImplementedError
 
     def mutate(
@@ -386,6 +387,6 @@ class Mutations:
         net, activation_state = self.add_connection(
             connection_key, net, activation_state, scale_weights
         )
-        net = self.activation_fn_mutation()
+        net = self.activation_fn_mutation(activation_key)
 
         return net, activation_state

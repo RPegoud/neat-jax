@@ -31,11 +31,11 @@ Mutations:
 
 Misc:
 
+* [ ] Add Hydra config for constant attributes
+* [ ] Separate ``max_nodes`` and ``max_connections``
 * [ ] Add bias
 * [ ] Refactor activation state (maybe include it in the network class)
-* [ ] Separate ``max_nodes`` and ``max_connections``
 * [ ] Set the minimum sender index to 1 instead of 0
-* [ ] Add Hydra config for constant attributes
 
 Crossing:
 

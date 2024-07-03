@@ -4,8 +4,7 @@ import jax.random as random
 import networkx as nx
 from jax.typing import DTypeLike
 
-
-from .neat_dataclasses import Network
+from ..neat_dataclasses import Network
 
 
 def cartesian_product(

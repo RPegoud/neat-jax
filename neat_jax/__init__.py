@@ -10,4 +10,4 @@ from .nn import (
     toggle_receivers,
     update_depth,
 )
-from .utils import cartesian_product, plot_network, sample_from_mask
+from .utils import cartesian_product, log_config, plot_network, sample_from_mask

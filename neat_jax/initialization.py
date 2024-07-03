@@ -3,7 +3,7 @@ import jax
 import jax.numpy as jnp
 
 from .neat_dataclasses import ActivationState, Network
-from .utils import cartesian_product
+from .utils.utils import cartesian_product
 
 
 def get_initial_activations(inputs: chex.Array, senders: chex.Array) -> chex.Array:

@@ -1,0 +1,7 @@
+suit_name: gymnax
+
+scenario:
+  name: CartPole-v1
+  task_name: cartpole
+
+kwargs: {}
