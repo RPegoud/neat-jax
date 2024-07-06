@@ -26,12 +26,12 @@ Mutations:
   * [x] Weight reset
   * [x] Add node
   * [x] Add connection
-  * [ ] Mutate activation
-* [ ] Wrap all mutations in a single function
+  * [x] Mutate activation
+* [x] Wrap all mutations in a single function
 
 Misc:
 
-* [ ] Add Hydra config for constant attributes
+* [x] Add Hydra config for constant attributes
 * [ ] Separate ``max_nodes`` and ``max_connections``
 * [ ] Add bias
 * [ ] Set the minimum sender index to 1 instead of 0
